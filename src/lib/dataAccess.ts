@@ -467,3 +467,69 @@ export async function listUsersForUser(user: SessionUser) {
   // Everyone else sees just themselves
   return db.select().from(users).where(eq(users.id, user.id));
 }
+
+// -------------------------------------------------------------------- OPERATION WRITE GUARDS
+
+/**
+ * Returns true if the user is allowed to *update the status* of this operation.
+ *
+ * Rules:
+ *  - Manager / full operations:write holders: always allowed.
+ *  - Everyone else (Operator, QA, Tech): only if the operation is theirs
+ *    (operatorId = self) OR the operation is on a machine they're assigned to.
+ *
+ * This is used by the operations PATCH route to gate status changes
+ * (Ready / In Progress / Completed / Rejected). Note: it does NOT grant
+ * permission to add or delete steps - that requires operations:create or
+ * operations:delete, which only Manager has.
+ */
+export async function canUserUpdateOperation(
+  user: SessionUser,
+  operationId: number,
+): Promise<{ allowed: boolean; operation?: typeof orderOperations.$inferSelect; reason?: string }> {
+  if (isManager(user)) {
+    const [op] = await db.select().from(orderOperations).where(eq(orderOperations.id, operationId));
+    if (!op) return { allowed: false, reason: "Operation not found." };
+    return { allowed: true, operation: op };
+  }
+
+  const [op] = await db.select().from(orderOperations).where(eq(orderOperations.id, operationId));
+  if (!op) return { allowed: false, reason: "Operation not found." };
+
+  // The operator is the assigned operator for this step
+  if (op.operatorId === user.id) return { allowed: true, operation: op };
+
+  // Or the operator is assigned to the machine this step is on
+  if (op.machineId) {
+    const [machine] = await db.select().from(machines).where(eq(machines.id, op.machineId));
+    if (machine && machine.assignedOperatorId === user.id) {
+      return { allowed: true, operation: op };
+    }
+  }
+
+  // QA can mark QA-related steps complete
+  if (user.role === "QA & Dispatch") {
+    // For now, QA can update any operation that lives on a machine they're
+    // assigned to. If no specific assignment, fall through to deny.
+    if (op.machineId) {
+      const [machine] = await db.select().from(machines).where(eq(machines.id, op.machineId));
+      if (machine && machine.assignedOperatorId === user.id) {
+        return { allowed: true, operation: op };
+      }
+    }
+  }
+
+  // Technician can update operations on machines they're assigned to
+  if (user.role === "Technician" && op.machineId) {
+    const [machine] = await db.select().from(machines).where(eq(machines.id, op.machineId));
+    if (machine && machine.assignedOperatorId === user.id) {
+      return { allowed: true, operation: op };
+    }
+  }
+
+  return {
+    allowed: false,
+    operation: op,
+    reason: "You are not assigned to this operation or its machine.",
+  };
+}
