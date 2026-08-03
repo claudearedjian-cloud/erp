@@ -1,0 +1,232 @@
+"use client";
+
+import React from "react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  Cpu,
+  Tablet,
+  Users,
+  Package,
+  Wrench,
+  RefreshCw,
+  ShieldCheck,
+  UserCheck,
+  ChevronRight,
+  Sparkles,
+  Layers,
+  CalendarDays,
+  FileText,
+  Settings as SettingsIcon,
+  GanttChartSquare,
+  Activity
+} from "lucide-react";
+import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
+
+interface SidebarProps {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  currentUser: any;
+  allUsers: any[];
+  onSwitchUser: (user: any) => void;
+  onRequestSwitch: () => void;
+  onSelectSolutionMode?: (mode: "A" | "B") => void;
+  onReseed: () => void;
+  isSeeding: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  currentUser,
+  allUsers,
+  onSwitchUser,
+  onRequestSwitch,
+  onSelectSolutionMode,
+  onReseed,
+  isSeeding,
+  isOpen,
+  onClose,
+}: SidebarProps) {
+  const navItems = [
+    { id: "dashboard", label: "Executive Dashboard", icon: LayoutDashboard, badge: "" },
+    { id: "orders", label: "Orders & Routing", icon: ClipboardList, badge: "Live" },
+    { id: "schedule", label: "Dispatch Schedule", icon: CalendarDays, badge: "Plan" },
+    { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare, badge: "Timeline" },
+    { id: "machines", label: "Shop Floor Monitor", icon: Cpu, badge: "" },
+    { id: "cmms", label: "Asset CMMS", icon: Activity, badge: "PM" },
+    { id: "station", label: "Operator Station Mode", icon: Tablet, badge: "Touch" },
+    { id: "customers", label: "Clients & Architects", icon: Users, badge: "" },
+    { id: "inventory", label: "Wood & Edge Stock", icon: Package, badge: "" },
+    { id: "reports", label: "System Reports", icon: FileText, badge: "PDF" },
+    { id: "settings", label: "General Settings", icon: SettingsIcon, badge: "" },
+  ];
+
+  // Map the legacy tab id to our canonical ModuleId and filter by role
+  const visibleNavItems = navItems.filter(item => {
+    const moduleId = item.id === "station" ? "operator" : (item.id as ModuleId);
+    return canAccessModule(currentUser?.role, moduleId);
+  });
+
+  return (
+    <aside className={`fixed inset-y-0 left-0 w-72 bg-slate-900 text-slate-200 flex flex-col h-screen border-r border-slate-800 shadow-2xl flex-shrink-0 z-50 select-none transition-transform duration-200 md:relative md:translate-x-0 md:shadow-xl ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      {/* Brand & Factory Header */}
+      <div className="p-5 border-b border-slate-800 flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-900/40 text-white font-black text-xl tracking-tight">
+          WT
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5">
+            <h1 className="font-extrabold text-white text-lg tracking-tight">WoodTek ERP</h1>
+            <span className="bg-amber-500/20 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border border-amber-500/30">
+              PRO
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
+            <Layers className="w-3 h-3 text-amber-500" /> Furniture Service Center
+          </p>
+        </div>
+      </div>
+
+      {/* Navigation Links */}
+      <div className="flex-1 overflow-y-auto py-5 px-3 space-y-1.5 custom-scrollbar">
+        <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          Operations & Control
+        </div>
+        {visibleNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id || (activeTab.startsWith("order-") && item.id === "orders");
+          return (
+            <button
+              key={item.id}
+              onClick={() => { setActiveTab(item.id); onClose(); }}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-150 group ${
+                isActive
+                  ? "bg-amber-600 text-white font-semibold shadow-lg shadow-amber-600/30 translate-x-0.5"
+                  : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? "text-white" : "text-slate-400 group-hover:text-amber-400"}`} />
+                <span>{item.label}</span>
+              </div>
+              {item.badge && (
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                  isActive ? "bg-white/20 text-white" : "bg-slate-800 text-amber-400 border border-slate-700"
+                }`}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+
+        <div className="pt-6 px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          Factory Automation
+        </div>
+        <div className="px-3.5 py-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-400">
+          <div className="flex items-center gap-2 font-semibold text-slate-300 mb-1">
+            <Sparkles className="w-4 h-4 text-amber-400" /> Auto Workflow Engine
+          </div>
+          <p className="text-slate-400 text-[11px] leading-relaxed">
+            Completing an order operation automatically advances the part to the next machine along the line.
+          </p>
+        </div>
+      </div>
+
+      {/* Role Switcher & Auth Section */}
+      <div className="p-4 border-t border-slate-800 bg-slate-950/80">
+        {onSelectSolutionMode && (
+          <div className="mb-4 pb-3 border-b border-slate-800/80">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center justify-between">
+              <span>ERP Solution Modes</span>
+              <Sparkles className="w-3 h-3 text-amber-400" />
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                onClick={() => { onSelectSolutionMode("A"); onClose(); }}
+                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-[11px] font-bold text-slate-200 hover:text-white transition text-center"
+                title="Switch to Management & Order Routing (Solution A)"
+              >
+                Solution A: Manager
+              </button>
+              <button
+                onClick={() => { onSelectSolutionMode("B"); onClose(); }}
+                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-[11px] font-bold text-slate-200 hover:text-white transition text-center"
+                title="Switch to Operator Touchscreen Station (Solution B)"
+              >
+                Solution B: Workstation
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+          <span>Active Role Persona</span>
+          <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+        </div>
+
+        {/* Current logged in profile */}
+        <div className="relative group mb-3">
+          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-amber-500/50 transition cursor-pointer">
+            <div className={`w-9 h-9 rounded-lg ${currentUser?.avatarColor || "bg-amber-600"} flex items-center justify-center text-white font-bold text-sm shadow-md`}>
+              {currentUser?.name?.charAt(0) || "M"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold text-white truncate">{currentUser?.name || "Marcus Vance"}</div>
+              <div className="text-[11px] text-amber-400 font-semibold truncate flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 inline" /> {currentUser?.role || "Manager"}
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transform group-hover:translate-x-0.5 transition" />
+          </div>
+
+          {/* Popup Persona Selector */}
+          <div className="absolute bottom-full left-0 right-0 mb-2 p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 space-y-1 max-h-52 overflow-y-auto">
+            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 mb-1">
+              Switch Operational Role
+            </div>
+            {allUsers.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => onSwitchUser(user)}
+                className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-left text-xs transition ${
+                  currentUser?.id === user.id ? "bg-amber-500/20 text-white font-bold border border-amber-500/30" : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+              >
+                <div className={`w-6 h-6 rounded-md ${user.avatarColor} flex items-center justify-center text-[10px] text-white font-bold`}>
+                  {user.name.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-slate-200">{user.name}</div>
+                  <div className="text-[10px] text-slate-400 truncate">{user.role}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={onRequestSwitch}
+          className="mb-2 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 transition"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Switch profile (PIN required)</span>
+        </button>
+
+        {/* Re-seed Demo Button */}
+        <button
+          onClick={onReseed}
+          disabled={isSeeding}
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 hover:text-white font-medium text-xs border border-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Reset database with realistic WoodTek ERP demo data"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isSeeding ? "animate-spin text-amber-500" : ""}`} />
+          <span>{isSeeding ? "Reloading Factory Data..." : "Reset / Reseed Demo Data"}</span>
+        </button>
+      </div>
+    </aside>
+  );
+}
