@@ -34,7 +34,6 @@ export default function WoodTekERP() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [demoMode, setDemoMode] = useState(false);
 
@@ -105,21 +104,6 @@ export default function WoodTekERP() {
     bootstrap();
   }, []);
 
-  const handleReseed = async () => {
-    if (!confirm("Reset the database with fresh WoodTek demo factory data? All current changes will be lost.")) return;
-    setIsSeeding(true);
-    try {
-      await fetch("/api/seed?force=true", { method: "POST" });
-      setCurrentUser(null);
-      setAuthOpen(false);
-      await fetchAllData();
-    } catch (error) {
-      console.error("Reseed error", error);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
   const requestProfileSwitch = (candidate?: any) => {
     setAuthCandidate(candidate || null);
     setAuthOpen(true);
@@ -149,20 +133,6 @@ export default function WoodTekERP() {
 
   const handleSelectOrder = (orderId: number) => {
     setActiveTab(`order-${orderId}`);
-    setSidebarOpen(false);
-  };
-
-  const handleSelectSolutionMode = (mode: "A" | "B") => {
-    if (mode === "A") {
-      const managerUser = users.find(user => user.role === "Manager") || users[0];
-      if (managerUser) setCurrentUser(managerUser);
-      setActiveTab("dashboard");
-    } else {
-      const operatorUser = users.find(user => user.role === "Machine Operator") || users[1] || users[0];
-      if (operatorUser) setCurrentUser(operatorUser);
-      setActiveTab("station");
-    }
-    setAuthOpen(false);
     setSidebarOpen(false);
   };
 
@@ -196,9 +166,6 @@ export default function WoodTekERP() {
         allUsers={users}
         onSwitchUser={(user) => requestProfileSwitch(user)}
         onRequestSwitch={() => requestProfileSwitch()}
-        onSelectSolutionMode={handleSelectSolutionMode}
-        onReseed={handleReseed}
-        isSeeding={isSeeding}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -258,7 +225,6 @@ export default function WoodTekERP() {
           required={!currentUser}
           onAuthenticated={handleAuthenticated}
           onCancel={currentUser ? () => { setAuthOpen(false); setAuthCandidate(null); } : undefined}
-          onSelectSolutionMode={handleSelectSolutionMode}
           demoMode={demoMode}
         />
       )}

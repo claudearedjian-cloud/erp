@@ -9,7 +9,6 @@ import {
   Users,
   Package,
   Wrench,
-  RefreshCw,
   ShieldCheck,
   UserCheck,
   ChevronRight,
@@ -30,9 +29,6 @@ interface SidebarProps {
   allUsers: any[];
   onSwitchUser: (user: any) => void;
   onRequestSwitch: () => void;
-  onSelectSolutionMode?: (mode: "A" | "B") => void;
-  onReseed: () => void;
-  isSeeding: boolean;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -44,9 +40,6 @@ export default function Sidebar({
   allUsers,
   onSwitchUser,
   onRequestSwitch,
-  onSelectSolutionMode,
-  onReseed,
-  isSeeding,
   isOpen,
   onClose,
 }: SidebarProps) {
@@ -102,18 +95,18 @@ export default function Sidebar({
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id); onClose(); }}
-              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl font-medium text-sm transition-all duration-150 group ${
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 group ${
                 isActive
                   ? "bg-amber-600 text-white font-semibold shadow-lg shadow-amber-600/30 translate-x-0.5"
                   : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? "text-white" : "text-slate-400 group-hover:text-amber-400"}`} />
-                <span>{item.label}</span>
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <Icon className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? "text-white" : "text-slate-400 group-hover:text-amber-400"}`} />
+                <span className="truncate">{item.label}</span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${
                   isActive ? "bg-white/20 text-white" : "bg-slate-800 text-amber-400 border border-slate-700"
                 }`}>
                   {item.badge}
@@ -138,31 +131,6 @@ export default function Sidebar({
 
       {/* Role Switcher & Auth Section */}
       <div className="p-4 border-t border-slate-800 bg-slate-950/80">
-        {onSelectSolutionMode && (
-          <div className="mb-4 pb-3 border-b border-slate-800/80">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center justify-between">
-              <span>ERP Solution Modes</span>
-              <Sparkles className="w-3 h-3 text-amber-400" />
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                onClick={() => { onSelectSolutionMode("A"); onClose(); }}
-                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-[11px] font-bold text-slate-200 hover:text-white transition text-center"
-                title="Switch to Management & Order Routing (Solution A)"
-              >
-                Solution A: Manager
-              </button>
-              <button
-                onClick={() => { onSelectSolutionMode("B"); onClose(); }}
-                className="py-2 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/50 text-[11px] font-bold text-slate-200 hover:text-white transition text-center"
-                title="Switch to Operator Touchscreen Station (Solution B)"
-              >
-                Solution B: Workstation
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
           <span>Active Role Persona</span>
           <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -210,21 +178,10 @@ export default function Sidebar({
 
         <button
           onClick={onRequestSwitch}
-          className="mb-2 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 transition"
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 transition"
         >
           <ShieldCheck className="w-3.5 h-3.5" />
           <span>Switch profile (PIN required)</span>
-        </button>
-
-        {/* Re-seed Demo Button */}
-        <button
-          onClick={onReseed}
-          disabled={isSeeding}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 hover:text-white font-medium text-xs border border-slate-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Reset database with realistic WoodTek ERP demo data"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isSeeding ? "animate-spin text-amber-500" : ""}`} />
-          <span>{isSeeding ? "Reloading Factory Data..." : "Reset / Reseed Demo Data"}</span>
         </button>
       </div>
     </aside>
