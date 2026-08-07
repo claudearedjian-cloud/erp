@@ -1,0 +1,8 @@
+{
+  "name": "woodtek-erp-portable",
+  "version": "1.0.0",
+  "description": "WoodTek ERP - portable launcher",
+  "main": "portable-launcher.cjs",
+  "bin": "portable-launcher.cjs",
+  "private": true
+}
