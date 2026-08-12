@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
   // Windows .exe via `pkg`.
   output: "standalone",
 
+  // Tell webpack/turbopack NOT to bundle certain packages that have native
+  // binaries or that must remain at runtime. The standalone build will then
+  // copy them from node_modules into .next/standalone/node_modules.
+  // Without this, bcryptjs and pg can fail with "module not found" because
+  // the bundler can't follow their internal native require() calls.
+  serverExternalPackages: ["bcryptjs", "pg", "@types/bcryptjs"],
+
   // Allow LAN devices to access dev resources (HMR, dev chunks, etc.).
   // In development, a wide open allowlist is the right tradeoff: this file
   // is only loaded by `next dev`, and the dev server is never reachable

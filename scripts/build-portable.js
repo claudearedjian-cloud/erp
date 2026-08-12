@@ -73,7 +73,38 @@ async function main() {
   const pkgDir = path.join(DIST, "_pkg");
   rmrf(pkgDir);
   copyDir(STANDALONE, pkgDir);
-  copyDir(path.join(ROOT, ".next", "static"), path.join(pkgDir, ".next", "static"));
+
+  // Standalone output omits the .next/static folder. Copy it back in.
+  const nextStaticSrc = path.join(ROOT, ".next", "static");
+  if (fs.existsSync(nextStaticSrc)) {
+    copyDir(nextStaticSrc, path.join(pkgDir, ".next", "static"));
+  }
+
+  // Standalone output omits the public folder. Copy it back in.
+  const publicSrc = path.join(ROOT, "public");
+  if (fs.existsSync(publicSrc)) {
+    copyDir(publicSrc, path.join(pkgDir, "public"));
+  }
+
+  // Some Next.js 16 standalone builds also need the .next/server folder copied
+  // in full. Copy anything in .next that isn't already present.
+  const nextServerSrc = path.join(ROOT, ".next", "server");
+  if (fs.existsSync(nextServerSrc)) {
+    const pkgNextServer = path.join(pkgDir, ".next", "server");
+    fs.mkdirSync(pkgNextServer, { recursive: true });
+    for (const entry of fs.readdirSync(nextServerSrc)) {
+      const s = path.join(nextServerSrc, entry);
+      const d = path.join(pkgNextServer, entry);
+      if (!fs.existsSync(d)) {
+        try {
+          if (fs.statSync(s).isDirectory()) copyDir(s, d);
+          else fs.copyFileSync(s, d);
+        } catch (err) {
+          log(`  (skipped ${entry}: ${err.code || err.message})`);
+        }
+      }
+    }
+  }
 
   // Copy the runtime entry we ship with the .exe
   fs.copyFileSync(

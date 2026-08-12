@@ -155,6 +155,11 @@ export const orders = pgTable("orders", {
   // matches either column. Manager sees all.
   createdById: integer("created_by_id").references(() => users.id),
   assignedSalesId: integer("assigned_sales_id").references(() => users.id),
+  // --- Material accounting ---
+  // Computed/cached state of how well-stocked the order's materials are.
+  // Updated whenever materials are allocated, released, or consumed.
+  // Values: 'unknown' | 'in_stock' | 'partial' | 'out_of_stock' | 'consumed'
+  materialsStatus: text("materials_status").notNull().default("unknown"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -199,6 +204,23 @@ export const orderMaterials = pgTable("order_materials", {
   itemId: integer("item_id").notNull().references(() => inventoryItems.id),
   quantityUsed: integer("quantity_used").notNull().default(1),
   costPerUnit: numeric("cost_per_unit").notNull().default("0.00"),
+  // Stock accounting
+  consumed: boolean("consumed").notNull().default(false),
+  consumedAt: timestamp("consumed_at"),
+  released: boolean("released").notNull().default(false),
+  releasedAt: timestamp("released_at"),
+});
+
+// Audit trail: every consumption event
+export const materialConsumptions = pgTable("material_consumptions", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").notNull().references(() => inventoryItems.id),
+  quantity: integer("quantity").notNull(),
+  consumedBy: integer("consumed_by").references(() => users.id),
+  operationId: integer("operation_id").references(() => orderOperations.id),
+  notes: text("notes"),
+  consumedAt: timestamp("consumed_at").defaultNow().notNull(),
 });
 
 // Relations
@@ -252,6 +274,26 @@ export const orderMaterialsRelations = relations(orderMaterials, ({ one }) => ({
   item: one(inventoryItems, {
     fields: [orderMaterials.itemId],
     references: [inventoryItems.id],
+  }),
+}));
+
+export const materialConsumptionsRelations = relations(materialConsumptions, ({ one }) => ({
+  order: one(orders, {
+    fields: [materialConsumptions.orderId],
+    references: [orders.id],
+  }),
+  item: one(inventoryItems, {
+    fields: [materialConsumptions.itemId],
+    references: [inventoryItems.id],
+  }),
+  consumedByUser: one(users, {
+    fields: [materialConsumptions.consumedBy],
+    references: [users.id],
+    relationName: "consumption_user",
+  }),
+  operation: one(orderOperations, {
+    fields: [materialConsumptions.operationId],
+    references: [orderOperations.id],
   }),
 }));
 

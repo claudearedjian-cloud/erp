@@ -76,15 +76,25 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         itemUnit: inventoryItems.unit,
         quantityUsed: orderMaterials.quantityUsed,
         costPerUnit: orderMaterials.costPerUnit,
+        consumed: orderMaterials.consumed,
+        consumedAt: orderMaterials.consumedAt,
+        released: orderMaterials.released,
+        releasedAt: orderMaterials.releasedAt,
       })
       .from(orderMaterials)
       .leftJoin(inventoryItems, eq(orderMaterials.itemId, inventoryItems.id))
       .where(eq(orderMaterials.orderId, orderId));
 
+    // Total cost of materials (active allocations only)
+    const materialsTotalCost = mats
+      .filter((m) => !m.released)
+      .reduce((s, m) => s + Number(m.costPerUnit || 0) * m.quantityUsed, 0);
+
     return NextResponse.json({
       ...order,
       operations: ops,
       materials: mats,
+      materialsTotalCost: materialsTotalCost.toFixed(2),
     });
   } catch (error: any) {
     console.error("GET order details error:", error);
@@ -118,18 +128,40 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
     }
 
-    // Operators, QA, Technicians: NOT allowed to edit order metadata at all
-    // (only the order:edit gate above would let Sales/Manager through)
-
     const updateFields: any = {};
     if (body.title !== undefined) updateFields.title = body.title;
     if (body.projectType !== undefined) updateFields.projectType = body.projectType;
     if (body.priority !== undefined) updateFields.priority = body.priority;
-    if (body.status !== undefined) updateFields.status = body.status;
     if (body.totalValue !== undefined) updateFields.totalValue = String(body.totalValue);
     if (body.dueDate !== undefined) updateFields.dueDate = new Date(body.dueDate);
     if (body.progressPercent !== undefined) updateFields.progressPercent = Number(body.progressPercent);
     if (body.notes !== undefined) updateFields.notes = body.notes;
+    if (body.materialsStatus !== undefined) updateFields.materialsStatus = body.materialsStatus;
+
+    // If the caller is trying to mark the order as Completed, run the
+    // material-consumption flow first (in the same transaction).
+    if (body.status === "Completed") {
+      const { consumeMaterialsForOrder } = await import("@/lib/materials");
+      await consumeMaterialsForOrder(orderId, user.id, {
+        notes: "Order marked Completed",
+      });
+    }
+
+    // If the order is being put On Hold or some other inactive state,
+    // release any still-active reservations so other orders can use them.
+    if (body.status === "On Hold" || body.status === "Cancelled") {
+      const { releaseMaterialsForOrder } = await import("@/lib/materials");
+      await releaseMaterialsForOrder(orderId);
+    }
+
+    // Note: regular status changes (not Completed) don't go through the
+    // material flow - we still set status if provided.
+    if (body.status !== undefined && body.status !== "Completed" && body.status !== "On Hold" && body.status !== "Cancelled") {
+      updateFields.status = body.status;
+    } else if (body.status !== undefined) {
+      // Pass it through; the material helper doesn't change status itself
+      updateFields.status = body.status;
+    }
 
     const [updatedOrder] = await db
       .update(orders)

@@ -16,6 +16,7 @@ import GanttView from "@/components/GanttView";
 import CmmsView from "@/components/CmmsView";
 import ReportView from "@/components/ReportView";
 import SettingsView from "@/components/SettingsView";
+import FullscreenSplash from "@/components/FullscreenSplash";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 
 export default function WoodTekERP() {
@@ -36,6 +37,10 @@ export default function WoodTekERP() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [demoMode, setDemoMode] = useState(false);
+  // Show the fullscreen welcome splash when a user signs in.
+  // It closes once the dashboard finishes loading.
+  const [showSplash, setShowSplash] = useState(false);
+  const [hasShownSplash, setHasShownSplash] = useState(false);
 
   const fetchRoster = async () => {
     try {
@@ -89,6 +94,9 @@ export default function WoodTekERP() {
           setDemoMode(Boolean(me.demoMode));
           if (me.user) {
             setCurrentUser(me.user);
+            // Show the welcome splash on page refresh too
+            setShowSplash(true);
+            setHasShownSplash(true);
             await fetchAllData();
             return;
           }
@@ -115,6 +123,9 @@ export default function WoodTekERP() {
     setAuthOpen(false);
     setAuthCandidate(null);
     if (user.role === "Machine Operator") setActiveTab("station");
+    // Show the fullscreen welcome splash for this user
+    setShowSplash(true);
+    setHasShownSplash(true);
     await fetchAllData();
   };
 
@@ -128,7 +139,29 @@ export default function WoodTekERP() {
     setAuthCandidate(null);
     setAuthOpen(false);
     setSidebarOpen(false);
+    setShowSplash(false);
+    setHasShownSplash(false);
     await fetchRoster();
+  };
+
+  const exitApp = async () => {
+    // Confirm first - signing out + closing the window is destructive
+    const ok = window.confirm(
+      "Exit WoodTek ERP?\n\n" +
+      "You will be signed out and the window will close.\n" +
+      "If the dev server is running, it will keep running in the background — " +
+      "you can restart it from C:\\woodtek-erp\\backup\\start-woodtek.bat."
+    );
+    if (!ok) return;
+    try {
+      await fetch("/api/auth", { method: "DELETE" });
+    } catch (error) {
+      console.error("Sign out failed during exit", error);
+    }
+    // Try to close the window. This works if the app was opened in
+    // Chrome/Edge --app=URL mode or a popup. In a regular tab, the
+    // browser will prompt the user to confirm.
+    window.close();
   };
 
   const handleSelectOrder = (orderId: number) => {
@@ -158,6 +191,13 @@ export default function WoodTekERP() {
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden antialiased">
+      {showSplash && currentUser && (
+        <FullscreenSplash
+          user={currentUser}
+          isLoading={loading}
+          onClose={() => setShowSplash(false)}
+        />
+      )}
       {sidebarOpen && <button className="fixed inset-0 z-40 bg-slate-950/75 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation" />}
       <Sidebar
         activeTab={activeTab}
@@ -186,6 +226,7 @@ export default function WoodTekERP() {
           onOpenMenu={() => setSidebarOpen(true)}
           onSwitchProfile={() => requestProfileSwitch()}
           onLock={lockWorkspace}
+          onExit={exitApp}
           canCreateOrder={canCreateOrders}
         />
 

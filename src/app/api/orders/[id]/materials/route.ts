@@ -3,12 +3,14 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orderMaterials, inventoryItems, orders } from "@/db/schema";
 import { authorize } from "@/lib/auth";
+import { applyMaterialsStatus, computeAvailability } from "@/lib/materials";
 
 /**
- * Bill-of-materials allocation. Every write runs inside a single transaction
- * so a race between two operators can never oversell the same sheet of MDF.
- * The invariant: stock delta on `inventory_items` and quantity change on
- * `order_materials` either both commit or neither does.
+ * Bill-of-materials allocation. The stock is RESERVED (not deducted) on
+ * allocation, and is only CONSUMED when the order is marked Completed.
+ *
+ * Each write runs inside a single transaction so a race between two
+ * operators can never oversell the same sheet of MDF.
  */
 
 async function loadOrderMaterials(orderId: number) {
@@ -24,6 +26,10 @@ async function loadOrderMaterials(orderId: number) {
       itemReorderLevel: inventoryItems.reorderLevel,
       quantityUsed: orderMaterials.quantityUsed,
       costPerUnit: orderMaterials.costPerUnit,
+      consumed: orderMaterials.consumed,
+      consumedAt: orderMaterials.consumedAt,
+      released: orderMaterials.released,
+      releasedAt: orderMaterials.releasedAt,
     })
     .from(orderMaterials)
     .leftJoin(inventoryItems, eq(orderMaterials.itemId, inventoryItems.id))
@@ -64,34 +70,73 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const [orderRow] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId));
     if (!orderRow) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-    // Single atomic transaction — either the stock moves AND the BOM row updates, or nothing does.
+    // Block allocation if the order is already Completed or Cancelled
+    if (orderRow.id && (await isTerminal(orderId))) {
+      return NextResponse.json(
+        { error: "Cannot allocate materials to a completed or cancelled order." },
+        { status: 409 },
+      );
+    }
+
+    // Atomic transaction:
+    //   1. Look up the item and check that reserving N units won't put us
+    //      below zero (considering other active reservations on the same item)
+    //   2. Upsert the order_materials row (re-uses an existing allocation
+    //      for the same item, otherwise creates a new one)
+    //   3. Recompute the order's materials_status
+    //
+    // NOTE: stockQuantity is NOT debited here. It is only debited when the
+    // order is marked Completed, by the consumeMaterialsForOrder() helper.
     await db.transaction(async (tx) => {
       const [item] = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, itemId));
       if (!item) throw Object.assign(new Error("Stock item not found."), { httpStatus: 404 });
 
+      // What is the available stock considering all active reservations
+      // (excluding the current allocation, if any)?
+      const availability = await computeAvailability();
+      const itemAvail = availability.get(itemId) || {
+        stockQuantity: Number(item.stockQuantity) || 0,
+        reserved: 0,
+        available: Number(item.stockQuantity) || 0,
+      };
       const [existing] = await tx
         .select()
         .from(orderMaterials)
         .where(and(eq(orderMaterials.orderId, orderId), eq(orderMaterials.itemId, itemId)));
+      const existingQty = existing && !existing.released ? existing.quantityUsed : 0;
+      const additionalRequired = quantity - existingQty;
 
-      // `delta` = additional units to pull from the warehouse (negative = return to stock).
-      const delta = existing ? quantity - existing.quantityUsed : quantity;
-
-      if (delta > 0 && item.stockQuantity < delta) {
+      if (additionalRequired > itemAvail.available) {
         throw Object.assign(
           new Error(
-            `Only ${item.stockQuantity} ${item.unit} of ${item.sku} in stock — cannot allocate ${quantity}. ` +
-              (existing ? `Already reserved to this order: ${existing.quantityUsed}.` : ""),
+            `Insufficient stock for ${item.sku}. ` +
+              `On hand: ${itemAvail.stockQuantity}, ` +
+              `Reserved by other orders: ${itemAvail.reserved}, ` +
+              `Available now: ${itemAvail.available}. ` +
+              `Requested additional: ${additionalRequired}.`,
           ),
           { httpStatus: 409 },
         );
       }
 
       if (existing) {
-        await tx
-          .update(orderMaterials)
-          .set({ quantityUsed: quantity, costPerUnit: item.unitCost })
-          .where(eq(orderMaterials.id, existing.id));
+        if (existing.released) {
+          // A previously released allocation - re-use it (mark active again)
+          await tx
+            .update(orderMaterials)
+            .set({
+              quantityUsed: quantity,
+              costPerUnit: item.unitCost,
+              released: false,
+              releasedAt: null,
+            })
+            .where(eq(orderMaterials.id, existing.id));
+        } else {
+          await tx
+            .update(orderMaterials)
+            .set({ quantityUsed: quantity, costPerUnit: item.unitCost })
+            .where(eq(orderMaterials.id, existing.id));
+        }
       } else {
         await tx.insert(orderMaterials).values({
           orderId,
@@ -100,16 +145,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           costPerUnit: item.unitCost,
         });
       }
-
-      if (delta !== 0) {
-        await tx
-          .update(inventoryItems)
-          .set({ stockQuantity: item.stockQuantity - delta })
-          .where(eq(inventoryItems.id, itemId));
-      }
     });
 
-    return NextResponse.json({ success: true, materials: await loadOrderMaterials(orderId) });
+    // Recompute the order's materials status
+    const newStatus = await applyMaterialsStatus(orderId);
+
+    return NextResponse.json({
+      success: true,
+      materials: await loadOrderMaterials(orderId),
+      materialsStatus: newStatus,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to allocate material";
     const status = (err as { httpStatus?: number })?.httpStatus ?? 500;
@@ -132,6 +177,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       return NextResponse.json({ error: "Allocation ID is required." }, { status: 400 });
     }
 
+    let newStatus: string = "unknown";
+
     await db.transaction(async (tx) => {
       const [allocation] = await tx
         .select()
@@ -139,21 +186,53 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
         .where(and(eq(orderMaterials.orderId, orderId), eq(orderMaterials.id, allocationId)));
       if (!allocation) throw Object.assign(new Error("Allocation not found on this order."), { httpStatus: 404 });
 
-      const [item] = await tx.select().from(inventoryItems).where(eq(inventoryItems.id, allocation.itemId));
-      if (item) {
-        await tx
-          .update(inventoryItems)
-          .set({ stockQuantity: item.stockQuantity + allocation.quantityUsed })
-          .where(eq(inventoryItems.id, item.id));
+      // SAFETY: block deletion of consumed materials - you can only release
+      // them by first adding stock back to the inventory (via a stock
+      // adjustment in the inventory page).
+      if (allocation.consumed) {
+        throw Object.assign(
+          new Error(
+            "This material has already been consumed (the order is completed). " +
+              "It cannot be removed from the BOM. To re-add stock, create a stock adjustment.",
+          ),
+          { httpStatus: 409 },
+        );
       }
-      await tx.delete(orderMaterials).where(eq(orderMaterials.id, allocationId));
+
+      // If the allocation was already released, this is a no-op; just delete it.
+      if (!allocation.released) {
+        // Mark as released (does NOT return stock to inventory - it was only
+        // reserved, not consumed).
+        await tx
+          .update(orderMaterials)
+          .set({ released: true, releasedAt: new Date() })
+          .where(eq(orderMaterials.id, allocationId));
+      } else {
+        // Was already released: clean up the row entirely
+        await tx.delete(orderMaterials).where(eq(orderMaterials.id, allocationId));
+      }
     });
 
-    return NextResponse.json({ success: true, materials: await loadOrderMaterials(orderId) });
+    // Recompute the order's materials status
+    newStatus = await applyMaterialsStatus(orderId);
+
+    return NextResponse.json({
+      success: true,
+      materials: await loadOrderMaterials(orderId),
+      materialsStatus: newStatus,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to release material";
     const status = (err as { httpStatus?: number })?.httpStatus ?? 500;
     if (status >= 500) console.error("DELETE material allocation error:", err);
     return NextResponse.json({ error: message }, { status });
   }
+}
+
+async function isTerminal(orderId: number): Promise<boolean> {
+  const [o] = await db
+    .select({ status: orders.status })
+    .from(orders)
+    .where(eq(orders.id, orderId));
+  return o?.status === "Completed" || o?.status === "Cancelled";
 }
