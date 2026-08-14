@@ -219,11 +219,14 @@ export async function consumeMaterialsForOrder(
       });
     }
 
-    // 4. Mark the order as fully consumed
-    await tx
-      .update(orders)
-      .set({ materialsStatus: "consumed" })
-      .where(eq(orders.id, orderId));
+    // 4. Mark the order as fully consumed (only when there were allocations;
+    //    an order with no materials keeps its previous status)
+    if (allocs.length > 0) {
+      await tx
+        .update(orders)
+        .set({ materialsStatus: "consumed" })
+        .where(eq(orders.id, orderId));
+    }
 
     return { consumed: allocs.length, totalUnits };
   });

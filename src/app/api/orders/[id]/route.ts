@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { orders, customers, orderOperations, orderMaterials, machines, users, inventoryItems } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { orders, customers, orderOperations, orderMaterials, machines, users, inventoryItems, materialConsumptions } from "@/db/schema";
+import { eq, asc, sql } from "drizzle-orm";
 import { authorize } from "@/lib/auth";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -183,6 +183,26 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { id } = await context.params;
     const orderId = Number(id);
+
+    // Policy: block deletion if any material has been consumed on this order
+    // (locked setting: "Block delete if any material consumed").
+    const consumedRows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(materialConsumptions)
+      .where(eq(materialConsumptions.orderId, orderId));
+    const consumedCount = Number(consumedRows[0]?.count ?? 0);
+    if (consumedCount > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete this order: " +
+            consumedCount +
+            " material consumption record(s) exist on it. Deleting is blocked by the stock rollback policy — " +
+            "mark the order On Hold instead if it should not proceed.",
+        },
+        { status: 409 },
+      );
+    }
 
     // Delete related records first due to constraints
     await db.delete(orderMaterials).where(eq(orderMaterials.orderId, orderId));

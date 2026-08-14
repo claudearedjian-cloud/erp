@@ -203,7 +203,7 @@ export default function OrdersView({
           <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1">
             <Filter className="w-3.5 h-3.5 text-amber-500" /> Status:
           </span>
-          {["All", "Pending", "In Production", "Quality Review", "Completed", "On Hold"].map((s) => (
+          {["All", "Pending", "In Production", "Quality Review", "Completed", "On Hold", "Cancelled"].map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}

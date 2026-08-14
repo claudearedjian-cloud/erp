@@ -204,14 +204,37 @@ export default function OrderWorkflowDetail({
     }
   };
 
+  const handleOrderStatusChange = async (newStatus: string) => {
+    if (!newStatus || newStatus === order.status) return;
+    setActionError("");
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Unable to set status to "${newStatus}".`);
+      await fetchOrderDetail();
+      onRefresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to update order status.");
+    }
+  };
+
   const handleDeleteOrder = async () => {
     if (!confirm("Are you sure you want to permanently delete this production order?")) return;
+    setActionError("");
     try {
-      await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+      const response = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || `Server returned status ${response.status}.`);
+      }
       onRefresh();
       onBack();
     } catch (err) {
-      console.error("Failed to delete order", err);
+      setActionError(err instanceof Error ? err.message : "Failed to delete order.");
     }
   };
 
@@ -322,8 +345,20 @@ export default function OrderWorkflowDetail({
           </p>
         </div>
 
-        {/* Action Tabs & Delete */}
+        {/* Action Tabs, Status & Delete */}
         <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={order.status || "Pending"}
+            onChange={(e) => handleOrderStatusChange(e.target.value)}
+            title="Change order status (Completed consumes reserved materials; On Hold / Cancelled releases them)"
+            className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+          >
+            {["Pending", "In Production", "Quality Review", "Completed", "On Hold", "Cancelled"].map((s) => (
+              <option key={s} value={s} className="bg-slate-900 text-white">
+                {s}
+              </option>
+            ))}
+          </select>
           <div className="flex items-center bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
             <button
               onClick={() => setActiveTab("workflow")}
