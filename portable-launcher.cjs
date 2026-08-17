@@ -3,24 +3,25 @@
 // WoodTek ERP - portable launcher (bundled inside the .exe)
 // ----------------------------------------------------------------------------
 // When the .exe is run:
-//   1. Extract the bundled app to %APPDATA%\WoodTekERP\ (first run only)
-//   2. If no .env exists, prompt the user for the database connection
-//   3. Run `node server.js` to start the app
-//   4. Open the default browser to http://localhost:3000
-//   5. Wait for the user to press Ctrl+C, then shut down cleanly
-//
-// On subsequent runs, steps 1 and 2 are skipped - the app just starts.
+//   1. If no .env exists (exe folder, then %APPDATA%\WoodTekERP\), prompt the
+//      user for the database connection
+//   2. Run `node server.js` (the Next.js standalone server bundled in the
+//      snapshot) to start the app
+//   3. Open the default browser to http://localhost:3000
+//   4. Wait for the user to press Ctrl+C, then shut down cleanly
 // ============================================================================
 
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
-const { spawn, spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const readline = require("node:readline");
 
 const APPDATA = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
 const INSTALL_DIR = path.join(APPDATA, "WoodTekERP");
 const ENV_FILE = path.join(INSTALL_DIR, ".env");
+const EXE_DIR = path.dirname(process.execPath);
+const EXE_ENV_FILE = path.join(EXE_DIR, ".env");
 const PORT = process.env.PORT || "3000";
 
 // ANSI helpers (no-op if not a TTY)
@@ -41,7 +42,7 @@ function ensureInstallDir() {
 
 function envFileExists() {
   try {
-    return fs.existsSync(ENV_FILE);
+    return fs.existsSync(EXE_ENV_FILE) || fs.existsSync(ENV_FILE);
   } catch {
     return false;
   }
@@ -61,7 +62,7 @@ function ask(question, defaultValue = "") {
 }
 
 async function promptForEnv() {
-  log(`No .env found at ${ENV_FILE}`);
+  log(`No .env found next to the exe or at ${ENV_FILE}`);
   log("Let's configure the database connection. Press Enter to accept defaults.\n");
   const host = await ask("Database host", "127.0.0.1");
   const port = await ask("Database port", "5432");
@@ -86,6 +87,22 @@ async function promptForEnv() {
   log(`Wrote ${ENV_FILE}\n`);
 }
 
+function loadEnv() {
+  // Prefer the .env next to the exe (portable, self-contained); fall back to
+  // the app-data copy. Load into process.env so the spawned server inherits it.
+  const candidates = [EXE_ENV_FILE, ENV_FILE];
+  for (const f of candidates) {
+    if (!fs.existsSync(f)) continue;
+    const contents = fs.readFileSync(f, "utf8");
+    for (const line of contents.split("\n")) {
+      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+    }
+    log(`Using existing .env at ${f}\n`);
+    return;
+  }
+}
+
 function openBrowser() {
   const url = `http://localhost:${PORT}`;
   const cmd =
@@ -98,25 +115,40 @@ function openBrowser() {
 }
 
 function runApp() {
-  // The standalone build's server entry is .next/standalone/server.js
-  const serverEntry = path.join(INSTALL_DIR, "server.js");
-  if (!fs.existsSync(serverEntry)) {
-    // Fall back to the running exe directory (when running from extracted _pkg)
-    const alt = path.join(__dirname, "server.js");
-    if (fs.existsSync(alt)) {
-      return runNode(alt);
-    }
-    throw new Error(`server.js not found at ${serverEntry}`);
+  // The standalone build's server entry. When bundled with pkg, __dirname is
+  // the in-memory snapshot (C:\snapshot\_pkg\...) where the file genuinely
+  // lives — prefer it, since the exe IS the distribution unit.
+  const snapshotEntry = path.join(__dirname, "server.js");
+  if (fs.existsSync(snapshotEntry)) {
+    return runNode(snapshotEntry);
   }
-  return runNode(serverEntry);
+
+  const installedEntry = path.join(INSTALL_DIR, "server.js");
+  if (fs.existsSync(installedEntry)) {
+    return runNode(installedEntry);
+  }
+
+  const exeDirEntry = path.join(EXE_DIR, "server.js");
+  if (fs.existsSync(exeDirEntry)) {
+    return runNode(exeDirEntry);
+  }
+
+  throw new Error(`server.js not found (looked in snapshot, ${INSTALL_DIR}, ${EXE_DIR})`);
 }
 
 function runNode(scriptPath) {
-  // We are inside the pkg-bundled Node, so `process.execPath` is the .exe itself
-  // and we can re-spawn it with the script as argument
-  log(`Starting Node server: ${scriptPath}`);
+  // We are inside the pkg-bundled Node, so `process.execPath` is the .exe
+  // itself and we re-spawn it with the script as the entry argument.
+  //
+  // IMPORTANT: the script path may be inside the pkg snapshot (a virtual
+  // filesystem), so `path.dirname(scriptPath)` does NOT exist on the real
+  // disk. Spawning with a non-existent cwd throws ENOENT on Windows.
+  // Always spawn with a real, existing cwd (the app-data install dir).
+  const cwd = fs.existsSync(path.dirname(scriptPath)) ? path.dirname(scriptPath) : INSTALL_DIR;
+  ensureInstallDir();
+  log(`Starting Node server: ${scriptPath} (cwd ${cwd})`);
   return spawn(process.execPath, [scriptPath], {
-    cwd: path.dirname(scriptPath),
+    cwd,
     stdio: "inherit",
     env: { ...process.env },
   });
@@ -131,19 +163,18 @@ async function main() {
   if (!envFileExists()) {
     await promptForEnv();
   } else {
-    log(`Using existing .env at ${ENV_FILE}\n`);
-    // Make sure the app can read it
-    const envContents = fs.readFileSync(ENV_FILE, "utf8");
-    for (const line of envContents.split("\n")) {
-      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
-    }
+    loadEnv();
   }
 
   // Brief delay before opening browser so the server has a moment to bind
-  setTimeout(openBrowser, 2000);
+  setTimeout(openBrowser, 2500);
 
   const child = runApp();
+  child.on("error", (err) => {
+    console.error(`${cyan("[WoodTek ERP]")} Failed to start server: ${err.message}`);
+    console.error(`${cyan("[WoodTek ERP]")} ${err.stack || ""}`);
+    process.exit(1);
+  });
   child.on("exit", (code) => {
     if (code !== 0) {
       log(`${yellow("Server exited with code")} ${code}`);
