@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { orders, customers, orderOperations, orderMaterials, machines, users, inventoryItems, materialConsumptions } from "@/db/schema";
 import { eq, asc, sql } from "drizzle-orm";
 import { authorize } from "@/lib/auth";
+import { isFloorRole } from "@/lib/dataAccess";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { error: authError } = await authorize("orders:read");
@@ -90,11 +91,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       .filter((m) => !m.released)
       .reduce((s, m) => s + Number(m.costPerUnit || 0) * m.quantityUsed, 0);
 
+    // Field-level redaction for floor roles (Machine Operator, QA & Dispatch,
+    // Technician): hide order quote value + material costs.
+    const isFloor = isFloorRole(user);
+
     return NextResponse.json({
       ...order,
+      totalValue: isFloor ? null : order.totalValue,
       operations: ops,
-      materials: mats,
-      materialsTotalCost: materialsTotalCost.toFixed(2),
+      materials: isFloor ? mats.map(m => ({ ...m, costPerUnit: null })) : mats,
+      materialsTotalCost: isFloor ? null : materialsTotalCost.toFixed(2),
     });
   } catch (error: any) {
     console.error("GET order details error:", error);

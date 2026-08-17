@@ -340,8 +340,12 @@ export default function OrderWorkflowDetail({
             <span>Client: <strong className="text-slate-200">{order.customerCompany || order.customerName}</strong></span>
             <span>•</span>
             <span>Due Date: <strong className="text-amber-400">{new Date(order.dueDate).toLocaleDateString()}</strong></span>
-            <span>•</span>
-            <span>Quote: <strong className="text-white font-mono font-bold">${Number(order.totalValue).toLocaleString()}</strong></span>
+            {order.totalValue != null && (
+              <>
+                <span>•</span>
+                <span>Quote: <strong className="text-white font-mono font-bold">${Number(order.totalValue).toLocaleString()}</strong></span>
+              </>
+            )}
           </p>
         </div>
 

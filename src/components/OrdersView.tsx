@@ -341,7 +341,7 @@ export default function OrdersView({
               <div className="flex items-center justify-between md:justify-end gap-6 flex-shrink-0 border-t md:border-0 pt-3 md:pt-0 border-slate-800">
                 <div className="text-right">
                   <div className="text-sm font-black text-white font-mono">
-                    ${Number(order.totalValue || 0).toLocaleString()}
+                    {order.totalValue != null ? `$${Number(order.totalValue).toLocaleString()}` : <span className="text-slate-600 italic text-[10px]">restricted</span>}
                   </div>
                   <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Total Value</div>
                 </div>
@@ -398,7 +398,7 @@ export default function OrdersView({
 
                       <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
                         <span>Due {new Date(order.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                        <span className="font-black text-white font-mono">${Number(order.totalValue).toLocaleString()}</span>
+                        <span className="font-black text-white font-mono">{order.totalValue != null ? `$${Number(order.totalValue).toLocaleString()}` : "—"}</span>
                       </div>
                     </div>
                   ))}

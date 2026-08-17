@@ -106,7 +106,7 @@ export default function DashboardView({ data, loading, onNavigate }: DashboardVi
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-3xl font-black text-white tracking-tight">${Number(kpis.totalPipelineValue || 0).toLocaleString()}</div>
+          <div className="text-3xl font-black text-white tracking-tight">{kpis.totalPipelineValue != null ? `$${Number(kpis.totalPipelineValue).toLocaleString()}` : <span className="text-slate-600 italic text-lg">restricted</span>}</div>
           <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-slate-400">
             <span>Across {kpis.customerCount} commercial clients</span>
           </div>

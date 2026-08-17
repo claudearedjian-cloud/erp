@@ -93,7 +93,7 @@ export default function CustomersView({
                 <div className="text-xs text-slate-300 font-semibold">{c.name}</div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-lg font-black text-emerald-400 font-mono">${Number(c.totalSpend || 0).toLocaleString()}</div>
+                <div className="text-lg font-black text-emerald-400 font-mono">{c.totalSpend != null ? `$${Number(c.totalSpend).toLocaleString()}` : <span className="text-slate-600 italic text-[10px]">restricted</span>}</div>
                 <div className="text-[10px] text-slate-500 uppercase font-bold">Total WIP Spend</div>
               </div>
             </div>

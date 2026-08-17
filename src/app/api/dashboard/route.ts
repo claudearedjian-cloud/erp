@@ -9,6 +9,7 @@ import {
   listOperationsForUser,
   listCustomersForUser,
   isManager as userIsManager,
+  isFloorRole,
 } from "@/lib/dataAccess";
 
 export async function GET() {
@@ -71,7 +72,7 @@ export async function GET() {
     return NextResponse.json({
       kpis: {
         activeOrdersCount: activeOrders.length,
-        totalPipelineValue: userIsManager(user) ? totalPipelineValue.toFixed(2) : "—",
+        totalPipelineValue: isFloorRole(user) ? null : totalPipelineValue.toFixed(2),
         urgentOrdersCount,
         completedOrdersCount: completedThisMonth,
         utilizationRate,

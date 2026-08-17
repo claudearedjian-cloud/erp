@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { customers, orders } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { authorize } from "@/lib/auth";
-import { listCustomersForUser, isManager as userIsManager } from "@/lib/dataAccess";
+import { listCustomersForUser, isManager as userIsManager, isFloorRole } from "@/lib/dataAccess";
 
 export async function GET() {
   const { user, error: authError } = await authorize("customers:read");
@@ -30,7 +30,7 @@ export async function GET() {
         ...c,
         orderCount: custOrders.length,
         activeOrdersCount,
-        totalSpend: userIsManager(user) ? totalSpend.toFixed(2) : "—",
+        totalSpend: isFloorRole(user) ? null : totalSpend.toFixed(2),
       };
     });
 

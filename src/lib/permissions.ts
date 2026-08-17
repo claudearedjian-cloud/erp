@@ -42,19 +42,18 @@ const BASE_READ: Action[] = [
   "customers:read",
   "inventory:read",
   "cmms:read",
-  "reports:read",
 ];
 
 const MATRIX: Record<string, Action[]> = {
   Manager: [
     ...BASE_READ,
+    "reports:read",
     "orders:write", "orders:delete", "orders:edit",
     "operations:write", "operations:update-status", "operations:create", "operations:delete",
     "machines:write",
     "customers:write", "customers:delete",
     "inventory:write", "materials:write",
     "cmms:write", "cmms:configure",
-    "shifts:read", "attendance:read", "attendance:write",
     "reports:write",
     "shifts:read", "shifts:write",
     "attendance:read", "attendance:write",
@@ -63,6 +62,7 @@ const MATRIX: Record<string, Action[]> = {
   ],
   "Sales Coordinator": [
     ...BASE_READ,
+    "reports:read",
     "orders:write", "orders:edit",
     "customers:write",
     "materials:write",  // Sales can allocate materials when creating orders

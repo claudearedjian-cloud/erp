@@ -63,6 +63,20 @@ function isManager(user: SessionUser): boolean {
   return user.role === "Manager";
 }
 
+/**
+ * Floor roles (Machine Operator, QA & Dispatch, Technician) are restricted
+ * from commercial/financial data (order quote values, material costs).
+ * Managers and Sales Coordinators see financials (Sales quotes the orders).
+ */
+export function isFloorRole(user: SessionUser | { role: string } | null | undefined): boolean {
+  if (!user) return false;
+  return (
+    user.role === "Machine Operator" ||
+    user.role === "QA & Dispatch" ||
+    user.role === "Technician"
+  );
+}
+
 export { isManager };
 
 /**
@@ -216,8 +230,10 @@ export async function listOrdersForUser(
     createdByName: null as string | null,
   }));
 
-  // Field-level redaction: hide financial fields from non-Managers
-  if (!isManager(user)) {
+  // Field-level redaction: hide financial fields (order quote value) from
+  // floor roles only (Machine Operator, QA & Dispatch, Technician).
+  // Managers and Sales Coordinators see order values (Sales quotes them).
+  if (isFloorRole(user)) {
     scoped = scoped.map(o => ({ ...o, totalValue: null as unknown as string }));
   }
 
@@ -438,10 +454,12 @@ export async function computeDashboardKpisForUser(user: SessionUser): Promise<Da
 // -------------------------------------------------------------------- INVENTORY
 
 export async function listInventoryForUser(user: SessionUser) {
-  // Inventory is shared, but we still strip unit cost from non-Managers
+  // Inventory is shared; only Sales Coordinators are cost-restricted (unitCost hidden)
   const rows = await db.select().from(inventoryItems).orderBy(asc(inventoryItems.name));
-  if (isManager(user)) return rows;
-  return rows.map(i => ({ ...i, unitCost: null as unknown as string }));
+  if (user.role === "Sales Coordinator") {
+    return rows.map(i => ({ ...i, unitCost: null as unknown as string }));
+  }
+  return rows;
 }
 
 // -------------------------------------------------------------------- ASSETS / CMMS
