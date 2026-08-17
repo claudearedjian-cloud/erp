@@ -29,13 +29,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     // Non-Managers may only change: status, qualityNotes, rejectReason, actualMinutes.
     // Any other field (machineId, scheduledStart, operatorId, estimatedMinutes) is
-    // reserved for full operations:write (Manager only).
+    // reserved for full operations:write (Manager only) — EXCEPT that an operator
+    // may set operatorId to THEMSELVES (self-attribution when starting a job at
+    // their station). Reassigning to someone else stays Manager-only.
     if (user.role !== "Manager") {
       const restricted: string[] = [];
       if (body.machineId !== undefined) restricted.push("machineId");
       if (body.scheduledStart !== undefined) restricted.push("scheduledStart");
       if (body.scheduledEnd !== undefined) restricted.push("scheduledEnd");
-      if (body.operatorId !== undefined) restricted.push("operatorId");
+      if (body.operatorId !== undefined && Number(body.operatorId) !== Number(user.id)) restricted.push("operatorId");
       if (body.estimatedMinutes !== undefined) restricted.push("estimatedMinutes");
       if (restricted.length > 0) {
         return NextResponse.json(
