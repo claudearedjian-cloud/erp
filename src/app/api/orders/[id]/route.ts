@@ -6,8 +6,8 @@ import { authorize } from "@/lib/auth";
 import { isFloorRole } from "@/lib/dataAccess";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { error: authError } = await authorize("orders:read");
-  if (authError) return authError;
+  const { user, error: authError } = await authorize("orders:read");
+  if (authError || !user) return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { id } = await context.params;
