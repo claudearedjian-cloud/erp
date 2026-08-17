@@ -6,7 +6,8 @@ import {
   timestamp, 
   numeric, 
   boolean,
-  json
+  json,
+  date
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -323,4 +324,58 @@ export const maintenanceLogsRelations = relations(maintenanceLogs, ({ one }) => 
     fields: [maintenanceLogs.performedById],
     references: [users.id],
   }),
+}));
+
+// ----------------------------------------------------------------------------
+// Workforce: shift definitions, shift assignments (production calendar),
+// and time & attendance clock records.
+// ----------------------------------------------------------------------------
+
+// Shift definitions (Morning / Afternoon / Night, or custom factory shifts)
+export const shifts = pgTable("shifts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  startTime: text("start_time").notNull().default("06:00"), // "HH:MM" 24h
+  endTime: text("end_time").notNull().default("14:00"),     // "HH:MM" 24h
+  color: text("color").notNull().default("bg-amber-500"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Who works which shift on which day (production calendar / shift plan)
+export const shiftAssignments = pgTable("shift_assignments", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  shiftId: integer("shift_id").notNull().references(() => shifts.id),
+  workDate: date("work_date", { mode: "string" }).notNull(), // 'YYYY-MM-DD'
+  machineId: integer("machine_id").references(() => machines.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Time & attendance: one row per clock-in; clock_out NULL while on shift
+export const attendance = pgTable("attendance", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  shiftId: integer("shift_id").references(() => shifts.id),
+  clockIn: timestamp("clock_in").notNull().defaultNow(),
+  clockOut: timestamp("clock_out"),
+  status: text("status").notNull().default("Present"), // Present, Late, Absent (manager-set)
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const shiftsRelations = relations(shifts, ({ many }) => ({
+  assignments: many(shiftAssignments),
+}));
+
+export const shiftAssignmentsRelations = relations(shiftAssignments, ({ one }) => ({
+  user: one(users, { fields: [shiftAssignments.userId], references: [users.id] }),
+  shift: one(shifts, { fields: [shiftAssignments.shiftId], references: [shifts.id] }),
+  machine: one(machines, { fields: [shiftAssignments.machineId], references: [machines.id] }),
+}));
+
+export const attendanceRelations = relations(attendance, ({ one }) => ({
+  user: one(users, { fields: [attendance.userId], references: [users.id] }),
+  shift: one(shifts, { fields: [attendance.shiftId], references: [shifts.id] }),
 }));

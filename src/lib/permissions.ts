@@ -24,6 +24,10 @@ export type Action =
   | "cmms:configure"
   | "reports:read"
   | "reports:write"
+  | "shifts:read"
+  | "shifts:write"
+  | "attendance:read"
+  | "attendance:write"
   | "users:read"
   | "users:manage"
   | "admin:seed";
@@ -50,7 +54,10 @@ const MATRIX: Record<string, Action[]> = {
     "customers:write", "customers:delete",
     "inventory:write", "materials:write",
     "cmms:write", "cmms:configure",
+    "shifts:read", "attendance:read", "attendance:write",
     "reports:write",
+    "shifts:read", "shifts:write",
+    "attendance:read", "attendance:write",
     "users:read", "users:manage",
     "admin:seed",
   ],
@@ -65,6 +72,7 @@ const MATRIX: Record<string, Action[]> = {
     ...BASE_READ,
     "operations:update-status",  // can ONLY mark own operations as ready/in-progress/completed
     "inventory:write",  // can adjust stock they consume
+    "shifts:read", "attendance:read", "attendance:write",  // see own shift plan + clock in/out
   ],
   "QA & Dispatch": [
     ...BASE_READ,
@@ -72,12 +80,14 @@ const MATRIX: Record<string, Action[]> = {
     "inventory:write",
     "cmms:write",
     "reports:write",
+    "shifts:read", "attendance:read", "attendance:write",
   ],
   Technician: [
     ...BASE_READ,
     "machines:write",
     "operations:update-status",  // techs updating CMMS-related operation status
     "cmms:write", "cmms:configure",
+    "shifts:read", "attendance:read", "attendance:write",
     "reports:write",
   ],
 };

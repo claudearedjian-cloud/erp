@@ -18,7 +18,8 @@ import {
   FileText,
   Settings as SettingsIcon,
   GanttChartSquare,
-  Activity
+  Activity,
+  CalendarClock
 } from "lucide-react";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 
@@ -50,6 +51,7 @@ export default function Sidebar({
     { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare, badge: "Timeline" },
     { id: "machines", label: "Shop Floor Monitor", icon: Cpu, badge: "" },
     { id: "cmms", label: "Asset CMMS", icon: Activity, badge: "PM" },
+    { id: "workforce", label: "Workforce & Shifts", icon: CalendarClock, badge: "Shift" },
     { id: "station", label: "Operator Station Mode", icon: Tablet, badge: "Touch" },
     { id: "customers", label: "Clients & Architects", icon: Users, badge: "" },
     { id: "inventory", label: "Wood & Edge Stock", icon: Package, badge: "" },

@@ -20,7 +20,8 @@ export type ModuleId =
   | "gantt"
   | "cmms"
   | "reports"
-  | "settings";
+  | "settings"
+  | "workforce";
 
 /**
  * Every module a role is allowed to access. Manager sees all. Other roles
@@ -39,6 +40,7 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "cmms",
     "reports",
     "settings",
+    "workforce",
   ],
   "Sales Coordinator": [
     "dashboard",
@@ -52,6 +54,7 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "orders",
     "operator",
     "inventory",
+    "workforce",
   ],
   "QA & Dispatch": [
     "dashboard",
@@ -59,12 +62,14 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "machines",
     "inventory",
     "cmms",
+    "workforce",
   ],
   Technician: [
     "dashboard",
     "machines",
     "operator",
     "cmms",
+    "workforce",
   ],
 };
 

@@ -15,6 +15,7 @@ import ScheduleView from "@/components/ScheduleView";
 import GanttView from "@/components/GanttView";
 import CmmsView from "@/components/CmmsView";
 import ReportView from "@/components/ReportView";
+import WorkforceView from "@/components/WorkforceView";
 import SettingsView from "@/components/SettingsView";
 import FullscreenSplash from "@/components/FullscreenSplash";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
@@ -255,6 +256,7 @@ export default function WoodTekERP() {
             <CmmsView currentUser={currentUser} machines={machines} searchQuery={searchQuery} />
           )}
           {activeTab === "reports" && <ReportView currentUser={currentUser} searchQuery={searchQuery} />}
+          {activeTab === "workforce" && <WorkforceView currentUser={currentUser} machines={machines} />}
           {activeTab === "settings" && <SettingsView currentUser={currentUser} />}
         </main>
       </div>
