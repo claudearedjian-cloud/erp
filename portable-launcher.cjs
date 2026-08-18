@@ -140,12 +140,13 @@ function runNode(scriptPath) {
   // We are inside the pkg-bundled Node, so `process.execPath` is the .exe
   // itself and we re-spawn it with the script as the entry argument.
   //
-  // IMPORTANT: the script path may be inside the pkg snapshot (a virtual
-  // filesystem), so `path.dirname(scriptPath)` does NOT exist on the real
-  // disk. Spawning with a non-existent cwd throws ENOENT on Windows.
-  // Always spawn with a real, existing cwd (the app-data install dir).
-  const cwd = fs.existsSync(path.dirname(scriptPath)) ? path.dirname(scriptPath) : INSTALL_DIR;
+  // IMPORTANT: the script path is inside the pkg snapshot (a virtual
+  // filesystem). `fs.existsSync(path.dirname(scriptPath))` returns true
+  // there even though that path does NOT exist on the real Windows disk,
+  // so using it as the spawn cwd throws ENOENT. ALWAYS spawn with a real,
+  // existing cwd (the app-data install dir) — never the snapshot dir.
   ensureInstallDir();
+  const cwd = INSTALL_DIR;
   log(`Starting Node server: ${scriptPath} (cwd ${cwd})`);
   return spawn(process.execPath, [scriptPath], {
     cwd,
