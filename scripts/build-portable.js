@@ -103,6 +103,52 @@ async function main() {
     }
   }
 
+  // The Next.js standalone server.js calls process.chdir(__dirname) on boot.
+  // Inside pkg the bundle lives in a virtual snapshot dir (C:\snapshot\_pkg)
+  // that cannot be chdir'd to, which crashes the exe. Patch the generated
+  // server.js so it chdirs to a real directory instead (the app-data dir,
+  // falling back to the current working directory).
+  const serverJs = path.join(pkgDir, "server.js");
+  if (fs.existsSync(serverJs)) {
+    const orig = fs.readFileSync(serverJs, "utf8");
+    const patched = orig
+      .replace(
+        "process.chdir(__dirname)",
+        "try { process.chdir(process.env.APPDATA || process.cwd()); } catch (e) {}",
+      )
+      .replace(
+        "process.chdir(__dirname );",
+        "try { process.chdir(process.env.APPDATA || process.cwd()); } catch (e) {}",
+      );
+    if (patched !== orig) {
+      fs.writeFileSync(serverJs, patched);
+      log("Patched server.js chdir for pkg snapshot compatibility");
+    }
+  }
+
+  // pkg cannot provide the node:inspector builtin (ERR_INSPECTOR_NOT_AVAILABLE).
+  // Next's require-hook.js is the single interception point through which the
+  // failing require flows, so we short-circuit any 'node:inspector'/'inspector'
+  // request there and return a harmless stub (inspector is dev-only).
+  const requireHook = path.join(pkgDir, "node_modules", "next", "dist", "server", "require-hook.js");
+  if (fs.existsSync(requireHook)) {
+    const hookSrc = fs.readFileSync(requireHook, "utf8");
+    const guard =
+      "  if (request === 'node:inspector' || request === 'inspector') {\n" +
+      "    return { Session: class {}, close() {}, open() {}, url() { return undefined; }, waitForDebugger() {} };\n" +
+      "  }\n";
+    const patchedHook = hookSrc.replace(
+      "  return originalRequire.call(this, request);",
+      guard + "  return originalRequire.call(this, request);",
+    );
+    if (patchedHook !== hookSrc) {
+      fs.writeFileSync(requireHook, patchedHook);
+      log("Patched next require-hook.js (intercepted node:inspector for pkg)");
+    } else {
+      log("WARN: require-hook.js pattern not found - inspector stub may not apply");
+    }
+  }
+
   // Copy the runtime entry we ship with the .exe
   fs.copyFileSync(
     path.join(__dirname, "..", "portable-launcher.cjs"),
@@ -117,9 +163,37 @@ async function main() {
   log("Step 4/4: Bundling into a single .exe (this takes a few minutes)...");
   // --targets node18-win-x64 produces a 64-bit Windows executable
   // --output writes to the path we want
-  const pkgTargets = "node18-win-x64";
+  // Use the maintained pkg fork (@yao-pkg/pkg) with Node 22. The original
+  // pkg (5.8.1) is deprecated and its bundled Node 18 chokes on next's
+  // require of node:inspector; Node 22 handles it natively.
+  const pkgTargets = "node22-win-x64";
+
+  // pkg only bundles code reachable from the launcher entry. The standalone
+  // server.js (spawned at runtime) needs the full next runtime from
+  // node_modules, so we ship the standalone node_modules as pkg assets.
+  // The snapshot path is C:\snapshot\_pkg (mirrors pkgDir at runtime).
+  const pkgConfigPath = path.join(pkgDir, "pkg-config.json");
+  const nodeModulesRel = "node_modules";
+  fs.writeFileSync(
+    pkgConfigPath,
+    JSON.stringify(
+      {
+        pkg: {
+          assets: [
+            `${nodeModulesRel}/**/*`,
+            ".next/**/*",
+            "public/**/*",
+          ],
+          scripts: [],
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
   run(
-    `npx --yes pkg "${path.join(pkgDir, "portable-launcher.cjs")}" --targets ${pkgTargets} --output "${PORTABLE_EXE}"`,
+    `npx --yes @yao-pkg/pkg "${path.join(pkgDir, "portable-launcher.cjs")}" --config "${pkgConfigPath}" --targets ${pkgTargets} --output "${PORTABLE_EXE}"`,
     { cwd: ROOT },
   );
 
