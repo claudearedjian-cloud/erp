@@ -28,6 +28,11 @@ export type Action =
   | "shifts:write"
   | "attendance:read"
   | "attendance:write"
+  | "quality:read"
+  | "quality:write"
+  | "downtime:read"
+  | "downtime:write"
+  | "wip:read"
   | "users:read"
   | "users:manage"
   | "admin:seed";
@@ -57,6 +62,9 @@ const MATRIX: Record<string, Action[]> = {
     "reports:write",
     "shifts:read", "shifts:write",
     "attendance:read", "attendance:write",
+    "quality:read", "quality:write",
+    "downtime:read", "downtime:write",
+    "wip:read",
     "users:read", "users:manage",
     "admin:seed",
   ],
@@ -67,12 +75,16 @@ const MATRIX: Record<string, Action[]> = {
     "customers:write",
     "materials:write",  // Sales can allocate materials when creating orders
     "reports:write",
+    "wip:read",         // Sales can watch their orders move through the shop floor board
   ],
   "Machine Operator": [
     ...BASE_READ,
     "operations:update-status",  // can ONLY mark own operations as ready/in-progress/completed
     "inventory:write",  // can adjust stock they consume
     "shifts:read", "attendance:read", "attendance:write",  // see own shift plan + clock in/out
+    "quality:read", "quality:write",  // log scrap & rework at the station
+    "downtime:read", "downtime:write",  // report a machine down / running again
+    "wip:read",
   ],
   "QA & Dispatch": [
     ...BASE_READ,
@@ -81,6 +93,9 @@ const MATRIX: Record<string, Action[]> = {
     "cmms:write",
     "reports:write",
     "shifts:read", "attendance:read", "attendance:write",
+    "quality:read", "quality:write",  // QA owns defect disposition
+    "downtime:read",
+    "wip:read",
   ],
   Technician: [
     ...BASE_READ,
@@ -89,6 +104,9 @@ const MATRIX: Record<string, Action[]> = {
     "cmms:write", "cmms:configure",
     "shifts:read", "attendance:read", "attendance:write",
     "reports:write",
+    "quality:read",
+    "downtime:read", "downtime:write",  // technicians resolve machine downtime
+    "wip:read",
   ],
 };
 
@@ -127,6 +145,11 @@ const LABELS: Record<Action, string> = {
   "shifts:write": "manage shift definitions and assignments",
   "attendance:read": "view time and attendance records",
   "attendance:write": "clock in and out",
+  "quality:read": "view scrap and rework records",
+  "quality:write": "record or resolve scrap and rework events",
+  "downtime:read": "view machine downtime records",
+  "downtime:write": "record or end machine downtime",
+  "wip:read": "view the live work-in-progress board",
   "users:read": "view staff accounts",
   "users:manage": "manage staff accounts",
   "admin:seed": "reset demo data",

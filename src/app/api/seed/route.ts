@@ -12,7 +12,9 @@ import {
   reports,
   assets,
   maintenanceLogs,
-  cmmsSettings
+  cmmsSettings,
+  qualityEvents,
+  downtimeEvents
 } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { authorize, hashPin } from "@/lib/auth";
@@ -44,6 +46,8 @@ export async function POST(request: Request) {
     await db.delete(maintenanceLogs);
     await db.delete(assets);
     await db.delete(cmmsSettings);
+    await db.delete(qualityEvents);
+    await db.delete(downtimeEvents);
     await db.delete(reports);
     await db.delete(orderMaterials);
     await db.delete(orderOperations);
@@ -273,6 +277,22 @@ export async function POST(request: Request) {
       { orderId: ord2.id, itemId: varnish.id, quantityUsed: 12, costPerUnit: "42.00" },
       { orderId: ord3.id, itemId: melBoard.id, quantityUsed: 40, costPerUnit: "68.50" },
       { orderId: ord4.id, itemId: oakMdf.id, quantityUsed: 14, costPerUnit: "115.00" }
+    ]);
+
+    // 8b. Scrap & rework sample events (Feature B)
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 3600 * 1000);
+    await db.insert(qualityEvents).values([
+      { orderId: ord1.id, operationId: null, machineId: edge1.id, eventType: "scrap", quantity: 2, unit: "pcs", reason: "Tool wear", disposition: "Scrapped", estimatedCost: "45.00", recordedById: diego.id, notes: "Edge trim burn on two cabinet doors.", createdAt: hoursAgo(5), resolvedAt: hoursAgo(5) },
+      { orderId: ord2.id, operationId: null, machineId: cnc1.id, eventType: "rework", quantity: 1, unit: "pcs", reason: "Material defect", disposition: "Open", estimatedCost: "80.00", recordedById: elena.id, notes: "Surface chip on the island top — re-route face.", createdAt: hoursAgo(2), resolvedAt: null },
+      { orderId: ord2.id, operationId: null, machineId: saw1.id, eventType: "scrap", quantity: 1, unit: "sheets", reason: "Operator error", disposition: "Scrapped", estimatedCost: "68.50", recordedById: diego.id, notes: "Cut 3mm oversize on a melamine sheet.", createdAt: hoursAgo(7), resolvedAt: hoursAgo(7) },
+      { orderId: ord4.id, operationId: null, machineId: finish1.id, eventType: "rework", quantity: 1, unit: "pcs", reason: "Setup issue", disposition: "Reworked & Passed", estimatedCost: "30.00", recordedById: stefan.id, notes: "Slight orange peel — repolished and passed.", createdAt: hoursAgo(26), resolvedAt: hoursAgo(24) },
+    ]);
+
+    // 8c. Downtime sample events (Feature B)
+    await db.insert(downtimeEvents).values([
+      { machineId: drill1.id, reason: "Mechanical Failure", startedAt: hoursAgo(1.5), endedAt: null, durationMinutes: 0, operatorId: elena.id, notes: "Pneumatic clamp won't retract. Maintenance called." },
+      { machineId: edge1.id, reason: "Setup & Changeover", startedAt: hoursAgo(4), endedAt: hoursAgo(3.5), durationMinutes: 30, operatorId: diego.id, notes: "PUR glue cartridge swap and temperature ramp." },
+      { machineId: cnc1.id, reason: "Material Shortage", startedAt: hoursAgo(9), endedAt: hoursAgo(8), durationMinutes: 60, operatorId: alexei.id, notes: "Oak veneer sheets not yet delivered to the cell." },
     ]);
 
     // 9. CMMS Plant Asset Registry

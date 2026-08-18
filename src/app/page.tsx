@@ -17,6 +17,9 @@ import CmmsView from "@/components/CmmsView";
 import ReportView from "@/components/ReportView";
 import WorkforceView from "@/components/WorkforceView";
 import SettingsView from "@/components/SettingsView";
+import WipBoardView from "@/components/WipBoardView";
+import QualityView from "@/components/QualityView";
+import DowntimeView from "@/components/DowntimeView";
 import FullscreenSplash from "@/components/FullscreenSplash";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 
@@ -176,7 +179,7 @@ export default function WoodTekERP() {
   const tabToModule = (tab: string): ModuleId | null => {
     if (tab === "station") return "operator";
     if (tab.startsWith("order-")) return "orders";
-    const allowed: ModuleId[] = ["dashboard", "orders", "machines", "operator", "customers", "inventory", "schedule", "gantt", "cmms", "reports", "settings"];
+    const allowed: ModuleId[] = ["dashboard", "orders", "machines", "operator", "customers", "inventory", "schedule", "gantt", "cmms", "reports", "settings", "workforce", "wip", "quality", "downtime"];
     return (allowed as string[]).includes(tab) ? (tab as ModuleId) : null;
   };
 
@@ -257,6 +260,9 @@ export default function WoodTekERP() {
           )}
           {activeTab === "reports" && <ReportView currentUser={currentUser} searchQuery={searchQuery} />}
           {activeTab === "workforce" && <WorkforceView currentUser={currentUser} machines={machines} />}
+          {activeTab === "wip" && <WipBoardView onSelectOrder={handleSelectOrder} onNavigate={setActiveTab} />}
+          {activeTab === "quality" && <QualityView currentUser={currentUser} onSelectOrder={handleSelectOrder} />}
+          {activeTab === "downtime" && <DowntimeView currentUser={currentUser} />}
           {activeTab === "settings" && <SettingsView currentUser={currentUser} />}
         </main>
       </div>

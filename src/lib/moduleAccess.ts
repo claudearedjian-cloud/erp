@@ -21,7 +21,10 @@ export type ModuleId =
   | "cmms"
   | "reports"
   | "settings"
-  | "workforce";
+  | "workforce"
+  | "wip"
+  | "quality"
+  | "downtime";
 
 /**
  * Every module a role is allowed to access. Manager sees all. Other roles
@@ -41,6 +44,9 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "reports",
     "settings",
     "workforce",
+    "wip",
+    "quality",
+    "downtime",
   ],
   "Sales Coordinator": [
     "dashboard",
@@ -48,6 +54,7 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "customers",
     "schedule",
     "reports",
+    "wip",
   ],
   "Machine Operator": [
     "dashboard",
@@ -55,6 +62,9 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "operator",
     "inventory",
     "workforce",
+    "wip",
+    "quality",
+    "downtime",
   ],
   "QA & Dispatch": [
     "dashboard",
@@ -63,6 +73,9 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "inventory",
     "cmms",
     "workforce",
+    "wip",
+    "quality",
+    "downtime",
   ],
   Technician: [
     "dashboard",
@@ -70,6 +83,8 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "operator",
     "cmms",
     "workforce",
+    "wip",
+    "downtime",
   ],
 };
 

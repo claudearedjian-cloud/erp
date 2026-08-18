@@ -19,7 +19,9 @@ import {
   Settings as SettingsIcon,
   GanttChartSquare,
   Activity,
-  CalendarClock
+  CalendarClock,
+  AlertTriangle,
+  Zap
 } from "lucide-react";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 
@@ -46,11 +48,14 @@ export default function Sidebar({
 }: SidebarProps) {
   const navItems = [
     { id: "dashboard", label: "Executive Dashboard", icon: LayoutDashboard, badge: "" },
+    { id: "wip", label: "Live WIP Board", icon: Activity, badge: "Live" },
     { id: "orders", label: "Orders & Routing", icon: ClipboardList, badge: "Live" },
     { id: "schedule", label: "Dispatch Schedule", icon: CalendarDays, badge: "Plan" },
     { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare, badge: "Timeline" },
     { id: "machines", label: "Shop Floor Monitor", icon: Cpu, badge: "" },
-    { id: "cmms", label: "Asset CMMS", icon: Activity, badge: "PM" },
+    { id: "cmms", label: "Asset CMMS", icon: Zap, badge: "PM" },
+    { id: "downtime", label: "Downtime Log", icon: Zap, badge: "Down" },
+    { id: "quality", label: "Scrap & Rework", icon: AlertTriangle, badge: "QA" },
     { id: "workforce", label: "Workforce & Shifts", icon: CalendarClock, badge: "Shift" },
     { id: "station", label: "Operator Station Mode", icon: Tablet, badge: "Touch" },
     { id: "customers", label: "Clients & Architects", icon: Users, badge: "" },

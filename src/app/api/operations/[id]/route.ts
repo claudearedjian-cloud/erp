@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { orderOperations, orders, machines } from "@/db/schema";
-import { and, asc, eq, gt, isNotNull, lt, ne } from "drizzle-orm";
+import { orderOperations, orders, machines, qualityEvents } from "@/db/schema";
+import { and, asc, eq, gt, isNotNull, lt, ne, or } from "drizzle-orm";
 import { authorize } from "@/lib/auth";
 import { canUserUpdateOperation } from "@/lib/dataAccess";
 
@@ -176,6 +176,42 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         .set(updateData)
         .where(eq(orderOperations.id, operationId))
         .returning();
+
+      // --- Scrap & rework tracking -------------------------------------
+      // A rejection is recorded as a quality event in the same transaction so
+      // the defect trail survives even if the operation row is later changed.
+      if (requestedStatus === "Rejected/Rework") {
+        const disposition = body.rejectDisposition === "Scrap" ? "scrap" : "rework";
+        const rawQty = Math.floor(Number(body.rejectQuantity ?? 1));
+        const quantity = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+        await tx.insert(qualityEvents).values({
+          orderId: updatedOp.orderId,
+          operationId: updatedOp.id,
+          machineId: targetMachineId,
+          eventType: disposition,
+          quantity,
+          unit: "pcs",
+          reason: String(body.rejectReason || "").trim(),
+          disposition: disposition === "scrap" ? "Scrapped" : "Open",
+          estimatedCost: "0.00",
+          recordedById: user.id,
+          notes: null,
+          resolvedAt: disposition === "scrap" ? new Date() : null,
+        });
+      }
+
+      // Recovering from a rejection closes the open rework event on this step:
+      // restarting work marks it "In Rework", completing it marks it passed.
+      if (requestedStatus === "In Progress" || requestedStatus === "Completed") {
+        const targetDisposition = requestedStatus === "Completed" ? "Reworked & Passed" : "In Rework";
+        await tx.update(qualityEvents)
+          .set({ disposition: targetDisposition, resolvedAt: requestedStatus === "Completed" ? new Date() : null })
+          .where(and(
+            eq(qualityEvents.operationId, updatedOp.id),
+            eq(qualityEvents.eventType, "rework"),
+            or(eq(qualityEvents.disposition, "Open"), eq(qualityEvents.disposition, "In Rework")),
+          ));
+      }
 
       const allOps = await tx
         .select()

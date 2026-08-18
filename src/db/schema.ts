@@ -379,3 +379,86 @@ export const attendanceRelations = relations(attendance, ({ one }) => ({
   user: one(users, { fields: [attendance.userId], references: [users.id] }),
   shift: one(shifts, { fields: [attendance.shiftId], references: [shifts.id] }),
 }));
+
+// ----------------------------------------------------------------------------
+// Quality: scrap & rework tracking.
+// Every defect is logged as an event. The Operator Station creates these
+// automatically when an operator rejects a job; QA / Manager can also record
+// them directly and resolve open rework items.
+// ----------------------------------------------------------------------------
+export const qualityEvents = pgTable("quality_events", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  operationId: integer("operation_id").references(() => orderOperations.id, { onDelete: "set null" }),
+  machineId: integer("machine_id").references(() => machines.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(), // 'scrap' | 'rework'
+  quantity: integer("quantity").notNull().default(1), // pieces scrapped or sent for rework
+  unit: text("unit").notNull().default("pcs"),
+  reason: text("reason").notNull(), // reject reason (shared with the Operator Station picker)
+  // Scrap:  'Scrapped' (closed on creation)
+  // Rework: 'Open' -> 'In Rework' -> 'Reworked & Passed' (or 'Scrapped' if rework fails)
+  disposition: text("disposition").notNull().default("Open"),
+  estimatedCost: numeric("estimated_cost").notNull().default("0.00"),
+  recordedById: integer("recorded_by_id").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+// ----------------------------------------------------------------------------
+// Downtime logging: one row per stoppage. ended_at is NULL while the stoppage
+// is still open (machine is down right now).
+// ----------------------------------------------------------------------------
+export const downtimeEvents = pgTable("downtime_events", {
+  id: serial("id").primaryKey(),
+  machineId: integer("machine_id").notNull().references(() => machines.id, { onDelete: "cascade" }),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  operationId: integer("operation_id").references(() => orderOperations.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(), // Mechanical Failure, Electrical Fault, Material Shortage, Setup & Changeover, Operator Unavailable, Quality Issue, Other
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  durationMinutes: integer("duration_minutes").notNull().default(0),
+  operatorId: integer("operator_id").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const qualityEventsRelations = relations(qualityEvents, ({ one }) => ({
+  order: one(orders, {
+    fields: [qualityEvents.orderId],
+    references: [orders.id],
+  }),
+  operation: one(orderOperations, {
+    fields: [qualityEvents.operationId],
+    references: [orderOperations.id],
+  }),
+  machine: one(machines, {
+    fields: [qualityEvents.machineId],
+    references: [machines.id],
+  }),
+  recordedBy: one(users, {
+    fields: [qualityEvents.recordedById],
+    references: [users.id],
+    relationName: "quality_recorder",
+  }),
+}));
+
+export const downtimeEventsRelations = relations(downtimeEvents, ({ one }) => ({
+  machine: one(machines, {
+    fields: [downtimeEvents.machineId],
+    references: [machines.id],
+  }),
+  order: one(orders, {
+    fields: [downtimeEvents.orderId],
+    references: [orders.id],
+  }),
+  operation: one(orderOperations, {
+    fields: [downtimeEvents.operationId],
+    references: [orderOperations.id],
+  }),
+  operator: one(users, {
+    fields: [downtimeEvents.operatorId],
+    references: [users.id],
+    relationName: "downtime_operator",
+  }),
+}));

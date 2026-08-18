@@ -17,6 +17,9 @@ import {
   X,
   BellRing,
   Star,
+  Zap,
+  Trash2,
+  RefreshCcw,
 } from "lucide-react";
 
 interface OperatorStationViewProps {
@@ -32,6 +35,16 @@ const REJECT_REASONS = [
   "Setup issue",
   "Waiting on parts",
   "Operator error",
+  "Other",
+];
+
+const DOWNTIME_REASONS = [
+  "Mechanical Failure",
+  "Electrical Fault",
+  "Material Shortage",
+  "Setup & Changeover",
+  "Operator Unavailable",
+  "Quality Issue",
   "Other",
 ];
 
@@ -74,6 +87,16 @@ export default function OperatorStationView({
   // C3 — structured reject flow
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  // B — scrap vs rework disposition + quantity captured at the station
+  const [rejectDisposition, setRejectDisposition] = useState<"rework" | "scrap">("rework");
+  const [rejectQuantity, setRejectQuantity] = useState(1);
+
+  // B — machine downtime quick action
+  const [downtimeOpen, setDowntimeOpen] = useState(false);
+  const [downtimeReason, setDowntimeReason] = useState(DOWNTIME_REASONS[0]);
+  const [downtimeNotes, setDowntimeNotes] = useState("");
+  const [downtimeBusy, setDowntimeBusy] = useState(false);
+  const [activeDowntime, setActiveDowntime] = useState<any>(null);
 
   // C4 — finish double-tap confirmation guard
   const [confirmingFinishId, setConfirmingFinishId] = useState<number | null>(null);
@@ -101,6 +124,15 @@ export default function OperatorStationView({
     if (!selectedMachineId) return;
     setLoadingOps(true);
     try {
+      // B — also pull any open downtime for this station so the banner is live.
+      const dtRes = await fetch(`/api/downtime?machineId=${selectedMachineId}&activeOnly=true`, { cache: "no-store" });
+      if (dtRes.ok) {
+        const dt = await dtRes.json();
+        setActiveDowntime((Array.isArray(dt) && dt.length > 0) ? dt[0] : null);
+      } else {
+        setActiveDowntime(null);
+      }
+
       const res = await fetch(`/api/operations?machineId=${selectedMachineId}&activeOnly=true`);
       if (res.ok) {
         const data = await res.json();
@@ -127,7 +159,7 @@ export default function OperatorStationView({
     return () => clearInterval(interval);
   }, [selectedMachineId]);
 
-  const handleTouchAction = async (opId: number, status: string, reason?: string) => {
+  const handleTouchAction = async (opId: number, status: string, reason?: string, extra?: Record<string, unknown>) => {
     if (busyOperationId !== null) return;
     if (status === "Rejected/Rework" && !reason?.trim()) {
       setActionError("Choose a reason for rejection.");
@@ -144,6 +176,7 @@ export default function OperatorStationView({
           status,
           rejectReason: reason?.trim() || undefined,
           operatorId: currentUser?.id ? Number(currentUser.id) : undefined,
+          ...(extra || {}),
         }),
       });
       const payload = await response.json();
@@ -166,6 +199,8 @@ export default function OperatorStationView({
   const openReject = (opId: number) => {
     setRejectingId(opId);
     setRejectReason("");
+    setRejectDisposition("rework");
+    setRejectQuantity(1);
     setActionError("");
   };
 
@@ -175,7 +210,10 @@ export default function OperatorStationView({
       return;
     }
     setRejectingId(null);
-    await handleTouchAction(opId, "Rejected/Rework", rejectReason);
+    await handleTouchAction(opId, "Rejected/Rework", rejectReason, {
+      rejectDisposition: rejectDisposition === "scrap" ? "Scrap" : "Rework",
+      rejectQuantity: Math.max(1, rejectQuantity),
+    });
   };
 
   // C4 — finish requires a second tap within 3s
@@ -188,6 +226,61 @@ export default function OperatorStationView({
       setConfirmingFinishId(op.id);
       if (confirmTimer.current) clearTimeout(confirmTimer.current);
       confirmTimer.current = setTimeout(() => setConfirmingFinishId(null), 3000);
+    }
+  };
+
+  // B — downtime quick actions
+  const startDowntime = async () => {
+    if (!selectedMachineId || downtimeBusy) return;
+    setDowntimeBusy(true);
+    setActionError("");
+    try {
+      const res = await fetch("/api/downtime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          machineId: Number(selectedMachineId),
+          reason: downtimeReason,
+          notes: downtimeNotes.trim() || undefined,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || "Could not start downtime.");
+      setDowntimeOpen(false);
+      setDowntimeNotes("");
+      setDowntimeReason(DOWNTIME_REASONS[0]);
+      setActionSuccess("Station marked DOWN — downtime is now being logged.");
+      setTimeout(() => setActionSuccess(""), 4000);
+      await fetchMachineQueue();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not start downtime.");
+      setTimeout(() => setActionError(""), 6000);
+    } finally {
+      setDowntimeBusy(false);
+    }
+  };
+
+  const endDowntime = async () => {
+    if (!activeDowntime || downtimeBusy) return;
+    setDowntimeBusy(true);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/downtime/${activeDowntime.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ end: true }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || "Could not end downtime.");
+      setActionSuccess("Station back up — downtime closed.");
+      setTimeout(() => setActionSuccess(""), 4000);
+      await fetchMachineQueue();
+      onRefresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not end downtime.");
+      setTimeout(() => setActionError(""), 6000);
+    } finally {
+      setDowntimeBusy(false);
     }
   };
 
@@ -213,12 +306,32 @@ export default function OperatorStationView({
             )}
           </div>
 
-          <div className="flex items-center gap-3 bg-slate-950 px-4 py-2.5 rounded-2xl border border-slate-800">
-            <User className="w-5 h-5 text-emerald-400" />
-            <div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Logged Operator</div>
-              <div className="text-sm font-black text-white">{currentUser?.name || "Machine Operator"}</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 bg-slate-950 px-4 py-2.5 rounded-2xl border border-slate-800">
+              <User className="w-5 h-5 text-emerald-400" />
+              <div>
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Logged Operator</div>
+                <div className="text-sm font-black text-white">{currentUser?.name || "Machine Operator"}</div>
+              </div>
             </div>
+
+            {/* B — machine down / back up */}
+            {activeDowntime ? (
+              <button
+                onClick={endDowntime}
+                disabled={downtimeBusy}
+                className="flex items-center gap-2 bg-rose-500 hover:bg-rose-400 text-slate-950 font-black text-sm px-5 py-2.5 rounded-2xl border-2 border-rose-300 shadow-lg shadow-rose-600/30 transition active:scale-95 disabled:opacity-50"
+              >
+                <Zap className="w-5 h-5 fill-slate-950" /> END DOWNTIME
+              </button>
+            ) : (
+              <button
+                onClick={() => setDowntimeOpen(true)}
+                className="flex items-center gap-2 bg-slate-950 hover:bg-slate-900 text-rose-400 font-black text-sm px-5 py-2.5 rounded-2xl border-2 border-rose-500/50 transition active:scale-95"
+              >
+                <Zap className="w-5 h-5" /> MACHINE DOWN
+              </button>
+            )}
           </div>
         </div>
 
@@ -285,6 +398,24 @@ export default function OperatorStationView({
         <div className="p-4 bg-rose-500/15 text-rose-200 font-bold text-center text-sm rounded-2xl border-2 border-rose-500/50 shadow-xl flex items-center justify-center gap-2" role="alert">
           <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0" />
           <span>{actionError}</span>
+        </div>
+      )}
+
+      {/* B — active downtime banner for the selected station */}
+      {activeDowntime && (
+        <div className="p-4 bg-rose-500/15 border-2 border-rose-500/50 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-pulse">
+          <div className="flex items-center gap-3">
+            <Zap className="w-6 h-6 text-rose-400 shrink-0" />
+            <div>
+              <div className="font-black text-rose-200 text-sm uppercase tracking-wider">
+                {currentMachine?.code} is DOWN — {activeDowntime.reason}
+              </div>
+              {activeDowntime.notes && <div className="text-[11px] text-rose-300/80 mt-0.5">{activeDowntime.notes}</div>}
+            </div>
+          </div>
+          <span className="text-[11px] font-bold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-2.5 py-1 rounded-lg whitespace-nowrap">
+            Logged {new Date(activeDowntime.startedAt).toLocaleTimeString()}
+          </span>
         </div>
       )}
 
@@ -410,6 +541,49 @@ export default function OperatorStationView({
                               </button>
                             ))}
                           </div>
+
+                          {/* B — scrap vs rework + quantity */}
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              onClick={() => setRejectDisposition("rework")}
+                              className={`flex-1 px-2 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide border-2 transition active:scale-95 flex items-center justify-center gap-1 ${
+                                rejectDisposition === "rework"
+                                  ? "bg-orange-500 text-slate-950 border-orange-300"
+                                  : "bg-slate-900 text-slate-300 border-slate-700"
+                              }`}
+                            >
+                              <RefreshCcw className="w-3.5 h-3.5" /> Rework
+                            </button>
+                            <button
+                              onClick={() => setRejectDisposition("scrap")}
+                              className={`flex-1 px-2 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide border-2 transition active:scale-95 flex items-center justify-center gap-1 ${
+                                rejectDisposition === "scrap"
+                                  ? "bg-rose-500 text-slate-950 border-rose-300"
+                                  : "bg-slate-900 text-slate-300 border-slate-700"
+                              }`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Scrap
+                            </button>
+                            <div className="flex items-center gap-1 bg-slate-900 border-2 border-slate-700 rounded-xl px-1.5 py-1">
+                              <button
+                                onClick={() => setRejectQuantity(q => Math.max(1, q - 1))}
+                                className="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-lg active:scale-95"
+                              >
+                                −
+                              </button>
+                              <span className="w-7 text-center font-black text-amber-400 text-sm">{rejectQuantity}</span>
+                              <button
+                                onClick={() => setRejectQuantity(q => q + 1)}
+                                className="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-lg active:scale-95"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold mt-1.5 uppercase tracking-wider">
+                            {rejectQuantity} pcs → {rejectDisposition === "scrap" ? "scrapped" : "sent for rework"}
+                          </div>
+
                           <div className="flex gap-2 mt-3">
                             <button
                               onClick={() => confirmReject(op.id)}
@@ -469,6 +643,66 @@ export default function OperatorStationView({
           </div>
         )}
       </div>
+
+      {/* B — Machine Down modal */}
+      {downtimeOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border-2 border-rose-500/50 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <Zap className="w-5 h-5 text-rose-400" /> Machine Down — {currentMachine?.code}
+              </h3>
+              <button onClick={() => setDowntimeOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Why is the station down?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DOWNTIME_REASONS.map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setDowntimeReason(r)}
+                      className={`px-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wide border-2 transition active:scale-95 text-left ${
+                        downtimeReason === r
+                          ? "bg-rose-500 text-slate-950 border-rose-300"
+                          : "bg-slate-950 text-slate-300 border-slate-700 hover:border-rose-500/60"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Notes (optional)</label>
+                <textarea
+                  value={downtimeNotes}
+                  onChange={(e) => setDowntimeNotes(e.target.value)}
+                  placeholder="What failed? Who was called?"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white h-20"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setDowntimeOpen(false)}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-black text-xs uppercase rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={startDowntime}
+                  disabled={downtimeBusy}
+                  className="flex-1 py-3 bg-rose-500 hover:bg-rose-400 text-slate-950 font-black text-xs uppercase rounded-xl transition active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4" /> Confirm Down
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

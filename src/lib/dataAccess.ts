@@ -25,6 +25,8 @@ import {
   inventoryItems,
   assets,
   maintenanceLogs,
+  qualityEvents,
+  downtimeEvents,
 } from "@/db/schema";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth";
@@ -484,6 +486,118 @@ export async function listUsersForUser(user: SessionUser) {
   }
   // Everyone else sees just themselves
   return db.select().from(users).where(eq(users.id, user.id));
+}
+
+// -------------------------------------------------------------------- QUALITY (SCRAP & REWORK)
+
+export type ScopedQualityEvent = typeof qualityEvents.$inferSelect & {
+  orderNumber: string | null;
+  orderTitle: string | null;
+  operationName: string | null;
+  machineCode: string | null;
+  machineName: string | null;
+  recordedByName: string | null;
+};
+
+export async function listQualityEventsForUser(
+  user: SessionUser,
+  filters?: { eventType?: string; disposition?: string; machineId?: number; orderId?: number; limit?: number },
+): Promise<ScopedQualityEvent[]> {
+  const allowedOrderIds = await allowedOrderIdsSubquery(user);
+  const ids = allowedOrderIds ? (await allowedOrderIds).map(r => r.id) : null;
+  if (ids && ids.length === 0) return [];
+
+  const whereClauses = [];
+  if (ids) whereClauses.push(inArray(qualityEvents.orderId, ids));
+  if (filters?.eventType && filters.eventType !== "All") whereClauses.push(eq(qualityEvents.eventType, filters.eventType));
+  if (filters?.disposition && filters.disposition !== "All") whereClauses.push(eq(qualityEvents.disposition, filters.disposition));
+  if (filters?.machineId) whereClauses.push(eq(qualityEvents.machineId, filters.machineId));
+  if (filters?.orderId) whereClauses.push(eq(qualityEvents.orderId, filters.orderId));
+
+  const rows = await db
+    .select({
+      id: qualityEvents.id,
+      orderId: qualityEvents.orderId,
+      operationId: qualityEvents.operationId,
+      machineId: qualityEvents.machineId,
+      eventType: qualityEvents.eventType,
+      quantity: qualityEvents.quantity,
+      unit: qualityEvents.unit,
+      reason: qualityEvents.reason,
+      disposition: qualityEvents.disposition,
+      estimatedCost: qualityEvents.estimatedCost,
+      recordedById: qualityEvents.recordedById,
+      notes: qualityEvents.notes,
+      createdAt: qualityEvents.createdAt,
+      resolvedAt: qualityEvents.resolvedAt,
+      orderNumber: orders.orderNumber,
+      orderTitle: orders.title,
+      operationName: orderOperations.operationName,
+      machineCode: machines.code,
+      machineName: machines.name,
+      recordedByName: users.name,
+    })
+    .from(qualityEvents)
+    .leftJoin(orders, eq(qualityEvents.orderId, orders.id))
+    .leftJoin(orderOperations, eq(qualityEvents.operationId, orderOperations.id))
+    .leftJoin(machines, eq(qualityEvents.machineId, machines.id))
+    .leftJoin(users, eq(qualityEvents.recordedById, users.id))
+    .where(whereClauses.length > 0 ? and(...whereClauses) : undefined)
+    .orderBy(desc(qualityEvents.createdAt));
+
+  const limited = filters?.limit ? rows.slice(0, filters.limit) : rows;
+  return limited as ScopedQualityEvent[];
+}
+
+// -------------------------------------------------------------------- DOWNTIME
+
+export type ScopedDowntimeEvent = typeof downtimeEvents.$inferSelect & {
+  machineName: string | null;
+  machineCode: string | null;
+  orderNumber: string | null;
+  operatorName: string | null;
+};
+
+export async function listDowntimeEventsForUser(
+  user: SessionUser,
+  filters?: { machineId?: number; activeOnly?: boolean; limit?: number },
+): Promise<ScopedDowntimeEvent[]> {
+  const allowedMachineIds = await allowedMachineIdsSubquery(user);
+  const ids = allowedMachineIds ? (await allowedMachineIds).map(r => r.id) : null;
+  if (ids && ids.length === 0) return [];
+
+  const whereClauses = [];
+  if (ids) whereClauses.push(inArray(downtimeEvents.machineId, ids));
+  if (filters?.machineId) whereClauses.push(eq(downtimeEvents.machineId, filters.machineId));
+  if (filters?.activeOnly) whereClauses.push(isNull(downtimeEvents.endedAt));
+
+  const rows = await db
+    .select({
+      id: downtimeEvents.id,
+      machineId: downtimeEvents.machineId,
+      orderId: downtimeEvents.orderId,
+      operationId: downtimeEvents.operationId,
+      reason: downtimeEvents.reason,
+      startedAt: downtimeEvents.startedAt,
+      endedAt: downtimeEvents.endedAt,
+      durationMinutes: downtimeEvents.durationMinutes,
+      operatorId: downtimeEvents.operatorId,
+      notes: downtimeEvents.notes,
+      createdAt: downtimeEvents.createdAt,
+      machineName: machines.name,
+      machineCode: machines.code,
+      orderNumber: orders.orderNumber,
+      operatorName: users.name,
+    })
+    .from(downtimeEvents)
+    .leftJoin(machines, eq(downtimeEvents.machineId, machines.id))
+    .leftJoin(orders, eq(downtimeEvents.orderId, orders.id))
+    .leftJoin(users, eq(downtimeEvents.operatorId, users.id))
+    .where(whereClauses.length > 0 ? and(...whereClauses) : undefined)
+    .orderBy(desc(downtimeEvents.startedAt));
+
+  const limited = filters?.limit ? rows.slice(0, filters.limit) : rows;
+  return limited as ScopedDowntimeEvent[];
 }
 
 // -------------------------------------------------------------------- OPERATION WRITE GUARDS
