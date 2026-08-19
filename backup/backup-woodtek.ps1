@@ -1,5 +1,5 @@
 # ============================================================================
-# WoodTek ERP — nightly database backup
+# WoodTek ERP - nightly database backup
 # ----------------------------------------------------------------------------
 # Dumps woodtek_factory (Postgres custom format, -Fc) into backup\ and keeps
 # the newest 14 dumps. Reads the connection details from the app's .env so
@@ -49,7 +49,7 @@ $env:PGPASSWORD = $null
 
 if ($code -ne 0) {
   "$stamp  BACKUP FAILED (exit $code)" | Out-File -FilePath $logFile -Append -Encoding utf8
-  Write-Error 'Backup failed — see backup\backup.log'
+  Write-Error 'Backup failed - see backup\backup.log'
   exit 1
 }
 

@@ -1,9 +1,9 @@
 # ============================================================================
-# WoodTek ERP — change the postgres SUPERUSER password
+# WoodTek ERP - change the postgres SUPERUSER password
 # ----------------------------------------------------------------------------
 # The postgres superuser password is currently the factory default. Change it
 # to something strong. This does NOT affect the app (the app logs in as
-# woodtek_owner) — it only protects the database from LAN tampering.
+# woodtek_owner) - it only protects the database from LAN tampering.
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File ops\change-postgres-password.ps1
 # ============================================================================

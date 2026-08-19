@@ -1,12 +1,12 @@
 # ============================================================================
-# WoodTek ERP — auto-start on Windows boot (runs before anyone logs in)
+# WoodTek ERP - auto-start on Windows boot (runs before anyone logs in)
 # ----------------------------------------------------------------------------
 # Registers two scheduled tasks under "WoodTek ERP":
 #   1. WoodTek ERP              - starts the production server at boot (SYSTEM)
 #   2. WoodTek ERP Backup       - nightly database backup at 02:30
 #
 # Requires an ADMINISTRATOR PowerShell. After this, the app starts
-# automatically on every boot — no console window, no login required.
+# automatically on every boot - no console window, no login required.
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File ops\install-autostart.ps1
 # Remove: powershell -ExecutionPolicy Bypass -File ops\remove-autostart.ps1

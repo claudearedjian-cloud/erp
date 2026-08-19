@@ -1,10 +1,10 @@
 # ============================================================================
-# WoodTek ERP — OPTIONAL: run as a real Windows service via NSSM
+# WoodTek ERP - OPTIONAL: run as a real Windows service via NSSM
 # ----------------------------------------------------------------------------
 # A Windows service is the most "professional" option: it runs before login,
 # auto-restarts on crash, and is managed like any other service
 # (services.msc). This is an alternative to the scheduled-task approach in
-# install-autostart.ps1 — pick ONE of the two.
+# install-autostart.ps1 - pick ONE of the two.
 #
 # Prerequisites:
 #   1. Download NSSM from https://nssm.cc/download  (nssm-2.24.zip)
