@@ -4,14 +4,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   ArrowRight,
   Delete,
-  LockKeyhole,
   ShieldCheck,
   X,
-  UserPlus,
   Mail,
   Loader2,
   CheckCircle2,
 } from "lucide-react";
+import BrandMark from "@/components/BrandMark";
 
 interface AuthGateProps {
   users: any[];
@@ -153,13 +152,11 @@ export default function AuthGate({ users, initialUser, required, onAuthenticated
   // A brand-new installation has no roster. Show setup, not a broken login.
   if (users.length === 0) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/95 p-4 backdrop-blur-md">
-        <div className="my-auto w-full max-w-xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50">
+      <div className="modal-backdrop fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 backdrop-blur-md">
+        <div className="my-auto w-full max-w-xl overflow-hidden rounded-3xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/60">
           <div className="border-b border-slate-800 bg-slate-950/80 px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20">
-                <UserPlus className="h-5 w-5 stroke-[2.5]" />
-              </div>
+              <BrandMark size={44} />
               <div>
                 <h2 className="text-lg font-black text-white">Create Factory Owner</h2>
                 <p className="text-xs text-slate-400">First-run setup · creates the only initial Manager account</p>
@@ -266,13 +263,11 @@ export default function AuthGate({ users, initialUser, required, onAuthenticated
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-4 backdrop-blur-md overflow-y-auto">
-      <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl shadow-black/50 my-auto">
+    <div className="modal-backdrop fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 backdrop-blur-md">
+      <div className="my-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/80 px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20">
-              <LockKeyhole className="h-5 w-5 stroke-[2.5]" />
-            </div>
+            <BrandMark size={44} />
             <div>
               <h2 className="text-lg font-black text-white">{required ? "WoodTek ERP Sign In" : "Authorize Role Switch"}</h2>
               <p className="text-xs text-slate-400">

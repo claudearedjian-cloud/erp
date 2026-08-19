@@ -24,6 +24,7 @@ import {
   Zap
 } from "lucide-react";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
+import BrandMark from "@/components/BrandMark";
 
 interface SidebarProps {
   activeTab: string;
@@ -73,21 +74,22 @@ export default function Sidebar({
   return (
     <aside className={`fixed inset-y-0 left-0 w-72 bg-slate-900 text-slate-200 flex flex-col h-screen border-r border-slate-800 shadow-2xl flex-shrink-0 z-50 select-none transition-transform duration-200 md:relative md:translate-x-0 md:shadow-xl ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
       {/* Brand & Factory Header */}
-      <div className="p-5 border-b border-slate-800 flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-900/40 text-white font-black text-xl tracking-tight">
-          WT
-        </div>
-        <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="font-extrabold text-white text-lg tracking-tight">WoodTek ERP</h1>
-            <span className="bg-amber-500/20 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border border-amber-500/30">
-              PRO
-            </span>
+      <div className="relative border-b border-slate-800 p-5">
+        <div className="flex items-center gap-3">
+          <BrandMark size={44} />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-lg font-extrabold tracking-tight text-white">WoodTek ERP</h1>
+              <span className="rounded border border-amber-500/30 bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                PRO
+              </span>
+            </div>
+            <p className="flex items-center gap-1 text-xs font-medium text-slate-400">
+              <Layers className="h-3 w-3 text-amber-500" /> Furniture Service Center
+            </p>
           </div>
-          <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-            <Layers className="w-3 h-3 text-amber-500" /> Furniture Service Center
-          </p>
         </div>
+        <span className="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-amber-500/40 via-slate-700/40 to-transparent" />
       </div>
 
       {/* Navigation Links */}
@@ -102,19 +104,22 @@ export default function Sidebar({
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id); onClose(); }}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 group ${
+              className={`relative w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 group ${
                 isActive
-                  ? "bg-amber-600 text-white font-semibold shadow-lg shadow-amber-600/30 translate-x-0.5"
-                  : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                  ? "bg-gradient-to-r from-amber-500 to-amber-600 font-bold text-slate-950 shadow-lg shadow-amber-950/40"
+                  : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
               }`}
             >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <Icon className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? "text-white" : "text-slate-400 group-hover:text-amber-400"}`} />
+              {isActive && (
+                <span className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-amber-400" />
+              )}
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <Icon className={`h-5 w-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? "text-slate-950" : "text-slate-400 group-hover:text-amber-400"}`} />
                 <span className="truncate">{item.label}</span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${
-                  isActive ? "bg-white/20 text-white" : "bg-slate-800 text-amber-400 border border-slate-700"
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                  isActive ? "bg-slate-950/25 text-slate-950" : "border border-slate-700 bg-slate-800 text-amber-400"
                 }`}>
                   {item.badge}
                 </span>
@@ -123,7 +128,8 @@ export default function Sidebar({
           );
         })}
 
-        <div className="pt-6 px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <div className="mx-3 mt-5 border-t border-slate-800/80 pt-4" />
+        <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Factory Automation
         </div>
         <div className="px-3.5 py-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-400">

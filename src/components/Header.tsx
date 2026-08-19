@@ -55,81 +55,91 @@ export default function Header({
     if (activeTab === "inventory") return "Raw Panels & Edge Stock";
     if (activeTab === "gantt") return "Production Gantt Chart";
     if (activeTab === "cmms") return "Plant Asset Analytics & CMMS";
+    if (activeTab === "wip") return "Live Work-In-Progress Board";
+    if (activeTab === "quality") return "Scrap & Rework Control";
+    if (activeTab === "downtime") return "Machine Downtime Log";
     if (activeTab === "reports") return "System Report Generator";
     if (activeTab === "settings") return "General Settings & Configuration";
     return "WoodTek ERP Platform";
   };
 
+  const iconBtn =
+    "flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-800/60 text-slate-300 transition hover:border-slate-600 hover:bg-slate-700/70 hover:text-white";
+
   return (
-    <header className="min-h-16 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-3 sm:px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm gap-3">
-      {/* Title & Status */}
-      <div className="flex items-center gap-3 min-w-0">
-        <button onClick={onOpenMenu} className="md:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-200" aria-label="Open navigation">
+    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-slate-800/80 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:px-6">
+      {/* Title & context */}
+      <div className="flex min-w-0 items-center gap-3">
+        <button onClick={onOpenMenu} className={`${iconBtn} md:hidden`} aria-label="Open navigation">
           <Menu className="h-5 w-5" />
         </button>
-        <h2 className="text-sm sm:text-lg font-bold text-white tracking-tight flex items-center gap-2.5 truncate">
-          <span className="truncate">{getTitle()}</span>
-        </h2>
 
-        {/* Real-time status indicator */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700/80 rounded-full px-3 py-1 text-xs text-slate-300 font-medium">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Shop Floor Live: <strong className="text-white font-mono">{timeStr || "--:--"}</strong></span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="hidden h-4 w-1 shrink-0 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 sm:block" />
+            <h2 className="truncate text-sm font-bold tracking-tight text-white sm:text-base">
+              {getTitle()}
+            </h2>
+          </div>
+          <p className="mt-0.5 hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 sm:block">
+            WoodTek ERP · Furniture Service Center
+          </p>
         </div>
       </div>
 
-      {/* Action Area */}
-      <div className="flex items-center gap-3">
-        {/* Search Input */}
-        <div className="relative hidden sm:block w-64">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search orders, clients, machines..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-slate-950/70 border border-slate-700/80 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-1 rounded"
-            >
-              ESC
-            </button>
-          )}
+      {/* Actions */}
+      <div className="flex items-center gap-2.5">
+        {/* Live clock */}
+        <div className="hidden items-center gap-2 rounded-full border border-slate-700/70 bg-slate-800/50 px-3 py-1.5 text-xs font-medium text-slate-300 md:flex">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+          <span className="font-mono text-white">{timeStr || "--:--:--"}</span>
         </div>
 
-        {/* Alert Pill if Bottlenecks or Low Stock */}
+        {/* Search */}
+        <div className="relative hidden w-64 sm:block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search orders, clients, machines…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-slate-700/80 bg-slate-950/70 py-1.5 pl-9 pr-12 text-xs text-white placeholder-slate-500 transition focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+          />
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 text-[9px] font-semibold text-slate-400">
+            /
+          </kbd>
+        </div>
+
+        {/* Alert pill */}
         {(bottleneckCount > 0 || lowStockCount > 0) && (
-          <div className="hidden lg:flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 px-3 py-1.5 rounded-lg text-xs font-semibold">
-            <ShieldAlert className="w-4 h-4 text-rose-500 animate-bounce" />
-            <span>
-              {bottleneckCount > 0 ? `${bottleneckCount} Machine Queue Alert` : ""}
-              {bottleneckCount > 0 && lowStockCount > 0 ? " | " : ""}
-              {lowStockCount > 0 ? `${lowStockCount} Low Stock Items` : ""}
+          <div className="hidden items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 lg:flex">
+            <ShieldAlert className="h-4 w-4 text-rose-400" />
+            <span className="whitespace-nowrap">
+              {bottleneckCount > 0 ? `${bottleneckCount} queue alert${bottleneckCount > 1 ? "s" : ""}` : ""}
+              {bottleneckCount > 0 && lowStockCount > 0 ? " · " : ""}
+              {lowStockCount > 0 ? `${lowStockCount} low stock` : ""}
             </span>
           </div>
         )}
 
-        <button onClick={onSwitchProfile} className="hidden sm:flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition hover:border-amber-500/50 hover:text-amber-300" title={`Switch profile — ${currentUser?.name || "employee"}`}>
+        <button onClick={onSwitchProfile} className={`${iconBtn} hidden sm:flex`} title={`Switch profile — ${currentUser?.name || "employee"}`}>
           <UserRoundCog className="h-4 w-4" />
         </button>
-        <button onClick={onLock} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition hover:border-rose-500/50 hover:text-rose-300" title="Lock workspace">
+        <button onClick={onLock} className={`${iconBtn} hover:border-rose-500/50 hover:text-rose-300`} title="Lock workspace">
           <LockKeyhole className="h-4 w-4" />
         </button>
-        <button onClick={onExit} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-slate-300 transition hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-300" title="Exit WoodTek ERP (signs you out and closes the window)">
+        <button onClick={onExit} className={`${iconBtn} hover:border-red-500/60 hover:bg-red-500/10 hover:text-red-300`} title="Exit WoodTek ERP">
           <Power className="h-4 w-4" />
         </button>
 
-        {/* Quick Create Order Button */}
         {canCreateOrder && (
           <button
             onClick={onNewOrder}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 active:from-amber-700 active:to-amber-800 text-white font-bold px-3.5 py-1.5 rounded-lg shadow-md shadow-amber-600/20 hover:shadow-lg hover:shadow-amber-600/30 transition text-xs whitespace-nowrap"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-gradient-to-b from-amber-400 to-amber-600 px-3.5 py-2 text-xs font-black text-slate-950 shadow-lg shadow-amber-950/40 ring-1 ring-inset ring-amber-300/40 transition hover:from-amber-300 hover:to-amber-500 active:scale-[0.97]"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span className="hidden sm:inline">New Order Flow</span><span className="sm:hidden">Order</span>
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+            <span className="hidden sm:inline">New Order Flow</span>
+            <span className="sm:hidden">Order</span>
           </button>
         )}
       </div>

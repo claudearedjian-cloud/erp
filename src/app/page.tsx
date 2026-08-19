@@ -194,7 +194,7 @@ export default function WoodTekERP() {
   }, [currentUser, activeTab]);
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden antialiased">
+    <div className="app-bg flex h-screen text-slate-100 font-sans overflow-hidden antialiased">
       {showSplash && currentUser && (
         <FullscreenSplash
           user={currentUser}
@@ -234,7 +234,7 @@ export default function WoodTekERP() {
           canCreateOrder={canCreateOrders}
         />
 
-        <main className="flex-1 pb-16">
+        <main key={activeTab} className="flex-1 pb-16 animate-fade-up">
           {activeTab === "dashboard" && <DashboardView data={dashboardData} loading={loading} onNavigate={setActiveTab} />}
           {activeTab === "orders" && (
             <OrdersView orders={orders} loading={loading} onSelectOrder={handleSelectOrder} onRefresh={fetchAllData}
