@@ -26,15 +26,20 @@ interface DashboardViewProps {
 export default function DashboardView({ data, loading, onNavigate }: DashboardViewProps) {
   if (loading || !data) {
     return (
-      <div className="p-6 space-y-6 animate-pulse">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
+          <h2 className="text-sm font-black tracking-wide text-slate-300">Loading your workspace…</h2>
+          <span className="ml-auto inline-block h-2.5 w-24 animate-pulse rounded-full bg-slate-800" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 bg-slate-800/50 rounded-2xl border border-slate-800" />
+            <div key={i} className="h-28 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 h-80 bg-slate-800/50 rounded-2xl border border-slate-800" />
-          <div className="h-80 bg-slate-800/50 rounded-2xl border border-slate-800" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
+          <div className="lg:col-span-2 h-80 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+          <div className="h-80 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
         </div>
       </div>
     );

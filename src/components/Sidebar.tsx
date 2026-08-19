@@ -21,7 +21,8 @@ import {
   Activity,
   CalendarClock,
   AlertTriangle,
-  Zap
+  Zap,
+  LockKeyhole
 } from "lucide-react";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 import BrandMark from "@/components/BrandMark";
@@ -97,36 +98,46 @@ export default function Sidebar({
         <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Operations & Control
         </div>
-        {visibleNavItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id || (activeTab.startsWith("order-") && item.id === "orders");
-          return (
-            <button
-              key={item.id}
-              onClick={() => { setActiveTab(item.id); onClose(); }}
-              className={`relative w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 group ${
-                isActive
-                  ? "bg-gradient-to-r from-amber-500 to-amber-600 font-bold text-slate-950 shadow-lg shadow-amber-950/40"
-                  : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
-              }`}
-            >
-              {isActive && (
-                <span className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-amber-400" />
-              )}
-              <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <Icon className={`h-5 w-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? "text-slate-950" : "text-slate-400 group-hover:text-amber-400"}`} />
-                <span className="truncate">{item.label}</span>
-              </div>
-              {item.badge && (
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                  isActive ? "bg-slate-950/25 text-slate-950" : "border border-slate-700 bg-slate-800 text-amber-400"
-                }`}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {visibleNavItems.length === 0 ? (
+          <div className="mx-1 my-2 rounded-xl border border-dashed border-slate-700/80 bg-slate-950/40 px-4 py-5 text-center">
+            <LockKeyhole className="mx-auto mb-2 h-5 w-5 text-amber-500/80" />
+            <p className="text-xs font-bold text-slate-300">Sign in to continue</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              Enter your shop PIN on the sign-in screen to load your modules and stations.
+            </p>
+          </div>
+        ) : (
+          visibleNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id || (activeTab.startsWith("order-") && item.id === "orders");
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setActiveTab(item.id); onClose(); }}
+                className={`relative w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 group ${
+                  isActive
+                    ? "bg-gradient-to-r from-amber-500 to-amber-600 font-bold text-slate-950 shadow-lg shadow-amber-950/40"
+                    : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-amber-400" />
+                )}
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <Icon className={`h-5 w-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? "text-slate-950" : "text-slate-400 group-hover:text-amber-400"}`} />
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                    isActive ? "bg-slate-950/25 text-slate-950" : "border border-slate-700 bg-slate-800 text-amber-400"
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })
+        )}
 
         <div className="mx-3 mt-5 border-t border-slate-800/80 pt-4" />
         <div className="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -152,13 +163,13 @@ export default function Sidebar({
         {/* Current logged in profile */}
         <div className="relative group mb-3">
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-amber-500/50 transition cursor-pointer">
-            <div className={`w-9 h-9 rounded-lg ${currentUser?.avatarColor || "bg-amber-600"} flex items-center justify-center text-white font-bold text-sm shadow-md`}>
-              {currentUser?.name?.charAt(0) || "M"}
+            <div className={`w-9 h-9 rounded-lg ${currentUser?.avatarColor || "bg-slate-700"} flex items-center justify-center text-white font-bold text-sm shadow-md`}>
+              {currentUser?.name?.charAt(0) || "?"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-white truncate">{currentUser?.name || "Marcus Vance"}</div>
-              <div className="text-[11px] text-amber-400 font-semibold truncate flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 inline" /> {currentUser?.role || "Manager"}
+              <div className="text-sm font-bold text-white truncate">{currentUser?.name || "Not signed in"}</div>
+              <div className="text-[11px] text-slate-400 font-semibold truncate flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 inline" /> {currentUser?.role || "Sign in required"}
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transform group-hover:translate-x-0.5 transition" />

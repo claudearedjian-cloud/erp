@@ -32,7 +32,9 @@ export default function Header({
   onExit,
   canCreateOrder,
 }: HeaderProps) {
-  const [timeStr, setTimeStr] = useState("");
+  const [timeStr, setTimeStr] = useState(() =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+  );
 
   useEffect(() => {
     const updateTime = () => {
