@@ -16,3 +16,9 @@ next-env.d.ts
 npm-debug.log*
 .DS_Store
 package-lock.json
+
+# production runtime artifacts
+logs/
+backup/*.dump
+backup/*.log
+backup/run-backup.bat
