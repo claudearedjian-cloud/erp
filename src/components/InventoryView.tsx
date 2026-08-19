@@ -91,26 +91,53 @@ export default function InventoryView({ items = [], loading, onRefresh }: Invent
     }
   };
 
-  if (loading) return <div className="p-6 text-slate-400 animate-pulse">Loading material inventory...</div>;
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
+          <h2 className="text-sm font-black tracking-wide text-slate-300">Loading material inventory…</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-pulse">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+          ))}
+        </div>
+        <div className="h-80 animate-pulse rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total SKUs</div>
+        <div className="rounded-2xl border border-slate-800/80 bg-slate-900/90 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total SKUs</div>
+            <div className="rounded-lg bg-blue-500/10 p-1.5 text-blue-400"><Package className="h-4 w-4" /></div>
+          </div>
           <div className="text-2xl font-black text-white mt-1">{totalItems}</div>
         </div>
-        <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">On-hand Units</div>
+        <div className="rounded-2xl border border-slate-800/80 bg-slate-900/90 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">On-hand Units</div>
+            <div className="rounded-lg bg-emerald-500/10 p-1.5 text-emerald-400"><Layers className="h-4 w-4" /></div>
+          </div>
           <div className="text-2xl font-black text-white mt-1">{totalUnits.toLocaleString()}</div>
         </div>
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">Reserved by Orders</div>
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">Reserved by Orders</div>
+            <div className="rounded-lg bg-amber-500/20 p-1.5 text-amber-300"><Lock className="h-4 w-4" /></div>
+          </div>
           <div className="text-2xl font-black text-amber-300 mt-1">{reservedUnits.toLocaleString()}</div>
         </div>
-        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-rose-400">Reorder Needed</div>
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-extrabold uppercase tracking-wider text-rose-400">Reorder Needed</div>
+            <div className="rounded-lg bg-rose-500/20 p-1.5 text-rose-300"><AlertTriangle className="h-4 w-4" /></div>
+          </div>
           <div className="text-2xl font-black text-rose-300 mt-1">{lowStockCount}</div>
         </div>
       </div>
@@ -135,14 +162,23 @@ export default function InventoryView({ items = [], loading, onRefresh }: Invent
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-xs px-4 py-2 rounded-xl shadow-md transition flex items-center gap-1.5 whitespace-nowrap"
+          className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 px-4 py-2 text-xs font-black text-slate-950 shadow-lg shadow-amber-950/40 ring-1 ring-inset ring-amber-300/40 transition hover:from-amber-300 hover:to-amber-500 active:scale-[0.97]"
         >
-          <Plus className="w-4 h-4 stroke-[2.5]" /> Receive / Add Stock Item
+          <Plus className="h-4 w-4 stroke-[2.5]" /> Receive / Add Stock Item
         </button>
       </div>
 
       {/* Items Table */}
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
+        {filtered.length === 0 ? (
+          <div className="p-14 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-950/60">
+              <Package className="h-7 w-7 text-amber-500/80 stroke-[1.5]" />
+            </div>
+            <h3 className="text-base font-bold text-white">No Stock Items Found</h3>
+            <p className="mt-1 text-xs text-slate-400">No materials match this category. Adjust the filter or receive new stock.</p>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -164,7 +200,7 @@ export default function InventoryView({ items = [], loading, onRefresh }: Invent
                 const isLow = available <= item.reorderLevel;
                 const hasReservations = reserved > 0;
                 return (
-                  <tr key={item.id} className="hover:bg-slate-850/60 transition">
+                  <tr key={item.id} className="transition hover:bg-slate-800/50">
                     <td className="py-4 px-5 font-medium">
                       <div className="font-mono text-[11px] font-black text-amber-400">{item.sku}</div>
                       <div className="text-sm font-extrabold text-white mt-0.5">{item.name}</div>
@@ -240,12 +276,13 @@ export default function InventoryView({ items = [], loading, onRefresh }: Invent
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* Add Item Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-slate-700/80 bg-slate-900 p-6 shadow-2xl shadow-black/60">
             <div className="flex justify-between items-center pb-3 border-b border-slate-800">
               <h3 className="text-base font-bold text-white">Register Raw Material Item</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
@@ -296,8 +333,8 @@ export default function InventoryView({ items = [], loading, onRefresh }: Invent
 
       {/* "Which orders use this material?" modal */}
       {showOrdersModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/60">
             <div className="flex justify-between items-center p-5 border-b border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-white">Orders using this material</h3>

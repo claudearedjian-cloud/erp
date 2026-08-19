@@ -184,6 +184,9 @@ export default function OrdersView({
     return "bg-slate-800 text-slate-300 border-slate-700";
   };
 
+  const isOverdue = (order: any) =>
+    order.status !== "Completed" && new Date(order.dueDate).getTime() < Date.now();
+
   const kanbanColumns = [
     { title: "Pending Start", status: "Pending", color: "border-slate-600" },
     { title: "In Production", status: "In Production", color: "border-amber-500" },
@@ -192,7 +195,20 @@ export default function OrdersView({
   ];
 
   if (loading) {
-    return <div className="p-6 text-slate-400 animate-pulse">Loading manufacturing orders...</div>;
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
+          <h2 className="text-sm font-black tracking-wide text-slate-300">Loading orders…</h2>
+        </div>
+        <div className="h-16 animate-pulse rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+        <div className="space-y-3 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -223,7 +239,7 @@ export default function OrdersView({
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-slate-950 text-slate-200 border border-slate-700 rounded-xl px-3 py-1 text-xs font-semibold focus:outline-none focus:border-amber-500"
+            className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-200 focus:border-amber-500 focus:outline-none"
           >
             <option value="All">Priority: All</option>
             <option value="Urgent">Priority: Urgent</option>
@@ -232,40 +248,47 @@ export default function OrdersView({
           </select>
 
           {/* View Toggle */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center rounded-xl border border-slate-800 bg-slate-950 p-1">
             <button
               onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
+              className={`flex items-center gap-1 rounded-lg p-1.5 text-xs font-bold transition ${
                 viewMode === "list" ? "bg-slate-800 text-amber-400" : "text-slate-400 hover:text-white"
               }`}
               title="List View"
             >
-              <List className="w-4 h-4" />
+              <List className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode("kanban")}
-              className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
+              className={`flex items-center gap-1 rounded-lg p-1.5 text-xs font-bold transition ${
                 viewMode === "kanban" ? "bg-slate-800 text-amber-400" : "text-slate-400 hover:text-white"
               }`}
               title="Kanban Board"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Results count */}
+          <span className="rounded-full border border-slate-700/70 bg-slate-800/50 px-3 py-1 text-[11px] font-bold text-slate-300">
+            {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"}
+          </span>
         </div>
       </div>
 
       {/* Empty State */}
       {filteredOrders.length === 0 ? (
-        <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-12 text-center max-w-lg mx-auto my-12">
-          <ClipboardList className="w-16 h-16 text-slate-600 mx-auto mb-4 stroke-[1.5]" />
-          <h3 className="text-lg font-bold text-white mb-1">No Orders Matching Filter</h3>
-          <p className="text-xs text-slate-400 mb-6">
+        <div className="mx-auto my-12 max-w-lg rounded-2xl border border-slate-800/80 bg-slate-900/90 p-12 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-950/60">
+            <ClipboardList className="h-8 w-8 text-amber-500/80 stroke-[1.5]" />
+          </div>
+          <h3 className="mb-1 text-lg font-bold text-white">No Orders Matching Filter</h3>
+          <p className="mb-6 text-xs text-slate-400">
             There are currently no manufacturing orders matching your criteria. Try resetting filters or create a new order to schedule operations.
           </p>
           <button
             onClick={() => { setStatusFilter("All"); setPriorityFilter("All"); setShowNewModal(true); }}
-            className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg transition"
+            className="rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-amber-950/40 transition hover:from-amber-300 hover:to-amber-500"
           >
             + Create Production Order
           </button>
@@ -277,7 +300,7 @@ export default function OrdersView({
             <div
               key={order.id}
               onClick={() => onSelectOrder(order.id)}
-              className="bg-slate-900/90 hover:bg-slate-850 border border-slate-800/80 hover:border-amber-500/50 rounded-2xl p-5 shadow-sm transition-all duration-150 cursor-pointer group flex flex-col md:flex-row md:items-center justify-between gap-4"
+              className="group flex cursor-pointer flex-col justify-between gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/90 p-5 shadow-sm transition-all duration-150 hover:border-amber-500/50 hover:bg-slate-800/70 md:flex-row md:items-center"
             >
               {/* Left Order Info */}
               <div className="flex items-start md:items-center gap-4 min-w-0 flex-1">
@@ -304,8 +327,10 @@ export default function OrdersView({
                     <span className="font-semibold text-slate-300 flex items-center gap-1">
                       <User className="w-3.5 h-3.5 text-slate-500" /> {order.customerCompany || order.customerName}
                     </span>
-                    <span className="flex items-center gap-1 text-slate-400">
-                      <Calendar className="w-3.5 h-3.5 text-slate-500" /> Due: {new Date(order.dueDate).toLocaleDateString()}
+                    <span className={`flex items-center gap-1 ${isOverdue(order) ? "font-bold text-rose-300" : "text-slate-400"}`}>
+                      <Calendar className={`h-3.5 w-3.5 ${isOverdue(order) ? "text-rose-400" : "text-slate-500"}`} />
+                      Due: {new Date(order.dueDate).toLocaleDateString()}
+                      {isOverdue(order) && " · overdue"}
                     </span>
                   </div>
                 </div>
@@ -416,8 +441,8 @@ export default function OrdersView({
 
       {/* CREATE ORDER MODAL WITH TEMPLATE SWITCHER */}
       {showNewModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden my-8">
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-md">
+          <div className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/60">
             <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
               <div>
                 <h3 className="text-lg font-black text-white flex items-center gap-2">
