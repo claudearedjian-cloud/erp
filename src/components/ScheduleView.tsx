@@ -197,7 +197,19 @@ export default function ScheduleView({ machines = [], currentUser, onRefresh, se
   };
 
   if (loading) {
-    return <div className="p-6 animate-pulse text-slate-400">Loading machine dispatch board…</div>;
+    return (
+      <div className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6">
+        <div className="flex items-center gap-3">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
+          <h2 className="text-sm font-black tracking-wide text-slate-300">Loading dispatch board…</h2>
+        </div>
+        <div className="h-20 animate-pulse rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+        <div className="grid animate-pulse gap-4 lg:grid-cols-[280px_1fr]">
+          <div className="h-72 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+          <div className="h-72 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+        </div>
+      </div>
+    );
   }
 
   return (

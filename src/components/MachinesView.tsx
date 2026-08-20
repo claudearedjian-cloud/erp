@@ -121,7 +121,20 @@ export default function MachinesView({
   };
 
   if (loading) {
-    return <div className="p-6 text-slate-400 animate-pulse font-medium">Loading factory machine monitors...</div>;
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <div className="flex items-center gap-3">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
+          <h2 className="text-sm font-black tracking-wide text-slate-300">Loading shop floor monitors…</h2>
+        </div>
+        <div className="h-16 animate-pulse rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-56 rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-800/60 to-slate-800/20" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
