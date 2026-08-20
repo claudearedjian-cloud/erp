@@ -21,7 +21,12 @@ import {
   CheckCircle2,
   X,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Timer,
+  Zap,
+  FileSpreadsheet,
+  RefreshCcw,
+  Clock
 } from "lucide-react";
 
 interface ReportViewProps {
@@ -36,6 +41,8 @@ const reportTypes = [
   { id: "Inventory Status", label: "Inventory Status", icon: Package },
   { id: "Client Activity", label: "Client Activity", icon: Users },
   { id: "Operator Performance", label: "Operator Performance", icon: TrendingUp },
+  { id: "Downtime Analysis", label: "Downtime Analysis", icon: Timer },
+  { id: "Scrap & Rework Analysis", label: "Scrap & Rework Analysis", icon: RefreshCcw },
 ];
 
 export default function ReportView({ currentUser, searchQuery = "" }: ReportViewProps) {
@@ -273,9 +280,158 @@ export default function ReportView({ currentUser, searchQuery = "" }: ReportView
         theme: "grid",
         headStyles: { fillColor: [245, 158, 11] },
       });
+    } else if (reportType === "Downtime Analysis") {
+      doc.setFontSize(14);
+      doc.text("Downtime Analysis", 14, startY);
+      startY += 10;
+
+      autoTable(doc, {
+        startY,
+        head: [["Metric", "Value"]],
+        body: [
+          ["Total Stoppages", String(data.kpis.totalStoppages)],
+          ["Total Downtime (hrs)", String(data.kpis.totalHours)],
+          ["Average Duration (min)", String(data.kpis.avgMinutes)],
+          ["Open Right Now", String(data.kpis.openStoppages)],
+        ],
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const after = (doc as any).lastAutoTable?.finalY ?? startY;
+      doc.setFontSize(14);
+      doc.text("By Reason (Pareto)", 14, after + 14);
+      autoTable(doc, {
+        startY: after + 18,
+        head: [["Reason", "Stoppages", "Minutes"]],
+        body: data.byReason.map((r: any) => [r.reason, String(r.count), String(r.minutes)]),
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const after2 = (doc as any).lastAutoTable?.finalY ?? after + 18;
+      doc.setFontSize(14);
+      doc.text("By Machine", 14, after2 + 14);
+      autoTable(doc, {
+        startY: after2 + 18,
+        head: [["Machine", "Stoppages", "Hours", "Avg (min)"]],
+        body: data.machines.map((m: any) => [m.machineCode, String(m.stoppages), String(m.hours), String(m.avgMinutes)]),
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+    } else if (reportType === "Scrap & Rework Analysis") {
+      doc.setFontSize(14);
+      doc.text("Scrap & Rework Analysis", 14, startY);
+      startY += 10;
+
+      autoTable(doc, {
+        startY,
+        head: [["Metric", "Value"]],
+        body: [
+          ["Scrap Quantity", String(data.kpis.scrapQty)],
+          ["Scrap Cost ($)", `$${Number(data.kpis.scrapCost).toLocaleString()}`],
+          ["Rework Quantity", String(data.kpis.reworkQty)],
+          ["Rework Cost ($)", `$${Number(data.kpis.reworkCost).toLocaleString()}`],
+          ["Open Rework", String(data.kpis.openRework)],
+          ["Rework Passed", String(data.kpis.reworkPassed)],
+        ],
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const after = (doc as any).lastAutoTable?.finalY ?? startY;
+      doc.setFontSize(14);
+      doc.text("Scrap by Reason", 14, after + 14);
+      autoTable(doc, {
+        startY: after + 18,
+        head: [["Reason", "Qty", "Est. Cost"]],
+        body: data.scrapByReason.map((r: any) => [r.reason, String(r.qty), `$${Number(r.cost).toLocaleString()}`]),
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11] },
+      });
+
+      const after2 = (doc as any).lastAutoTable?.finalY ?? after + 18;
+      doc.setFontSize(14);
+      doc.text("Rework by Reason", 14, after2 + 14);
+      autoTable(doc, {
+        startY: after2 + 18,
+        head: [["Reason", "Qty", "Est. Cost"]],
+        body: data.reworkByReason.map((r: any) => [r.reason, String(r.qty), `$${Number(r.cost).toLocaleString()}`]),
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11] },
+      });
     }
 
     doc.save(`${generatedReport.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.pdf`);
+  };
+
+  const exportCSV = () => {
+    if (!generatedReport) return;
+    const data = generatedReport.data;
+    const reportType = generatedReport.type;
+
+    const esc = (v: any) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const toCSV = (headers: string[], rows: (string | number)[][]) =>
+      [headers.map(esc).join(","), ...rows.map(r => r.map(esc).join(","))].join("\r\n");
+
+    let csv = "";
+
+    if (reportType === "Production Summary") {
+      csv = toCSV(
+        ["Metric", "Value"],
+        [["Total Orders", data.totalOrders], ["Completed", data.completedOrders], ["In Production", data.inProductionOrders], ["Pending", data.pendingOrders], ["Total Value", data.totalValue]],
+      );
+    } else if (reportType === "Machine Utilization") {
+      csv = toCSV(
+        ["Machine", "Category", "Operations", "Hours", "Status"],
+        data.machines.map((m: any) => [m.machineCode, m.category, m.completedOperations, m.totalHours, m.status]),
+      );
+    } else if (reportType === "Order Status") {
+      csv = toCSV(
+        ["Order #", "Title", "Status", "Progress", "Value"],
+        data.orders.map((o: any) => [o.orderNumber, o.title, o.status, `${o.progressPercent}%`, o.totalValue]),
+      );
+    } else if (reportType === "Inventory Status") {
+      csv = toCSV(
+        ["SKU", "Item", "Stock", "Unit", "Value", "Status"],
+        data.items.map((i: any) => [i.sku, i.name, i.stockQuantity, i.unit, i.totalValue, i.isLowStock ? "LOW" : "OK"]),
+      );
+    } else if (reportType === "Client Activity") {
+      csv = toCSV(
+        ["Client", "Contact", "Orders", "Active", "Total Spend"],
+        data.clients.map((c: any) => [c.company, c.contactName, c.totalOrders, c.activeOrders, c.totalSpend]),
+      );
+    } else if (reportType === "Operator Performance") {
+      csv = toCSV(
+        ["Operator", "Completed Ops", "Total Hours", "Efficiency"],
+        data.operators.map((o: any) => [o.name, o.completedOperations, o.totalHours, `${o.avgEfficiency}%`]),
+      );
+    } else if (reportType === "Downtime Analysis") {
+      csv = toCSV(
+        ["Reason", "Stoppages", "Minutes"],
+        data.byReason.map((r: any) => [r.reason, r.count, r.minutes]),
+      );
+    } else if (reportType === "Scrap & Rework Analysis") {
+      csv = toCSV(
+        ["Category", "Reason", "Qty", "Est. Cost"],
+        [
+          ...data.scrapByReason.map((r: any) => ["Scrap", r.reason, r.qty, r.cost]),
+          ...data.reworkByReason.map((r: any) => ["Rework", r.reason, r.qty, r.cost]),
+        ],
+      );
+    }
+
+    if (!csv) return;
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${generatedReport.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -366,6 +522,14 @@ export default function ReportView({ currentUser, searchQuery = "" }: ReportView
               >
                 <Download className="w-4 h-4" />
                 <span>Export PDF</span>
+              </button>
+
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs border border-slate-700 transition"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Export CSV</span>
               </button>
 
               <button
@@ -620,6 +784,180 @@ function ReportContent({ data, type }: { data: any; type: string }) {
             ))}
           </tbody>
         </table>
+      </div>
+    );
+  }
+
+  if (type === "Downtime Analysis") {
+    const maxReason = Math.max(1, ...data.byReason.map((r: any) => r.minutes));
+    const maxDay = Math.max(1, ...data.timeline.map((d: any) => d.minutes));
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Total Downtime" value={`${data.kpis.totalHours} hrs`} color="text-rose-600" icon={Timer} />
+          <StatCard label="Stoppages" value={String(data.kpis.totalStoppages)} icon={Zap} />
+          <StatCard label="Avg Duration" value={`${data.kpis.avgMinutes} min`} color="text-amber-600" icon={AlertTriangle} />
+          <StatCard label="Open Right Now" value={String(data.kpis.openStoppages)} color={data.kpis.openStoppages > 0 ? "text-rose-600" : "text-emerald-600"} icon={Clock} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Downtime by Reason</h3>
+            {data.byReason.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">No downtime recorded in this period.</p>
+            ) : (
+              <div className="space-y-3">
+                {data.byReason.map((r: any, i: number) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-semibold text-slate-700">{r.reason}</span>
+                      <span className="font-mono text-xs font-bold text-slate-600">{r.count}× · {r.minutes}m</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-full" style={{ width: `${(r.minutes / maxReason) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Daily Downtime Trend</h3>
+            {data.timeline.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">No downtime recorded in this period.</p>
+            ) : (
+              <div className="flex items-end gap-1.5 h-40">
+                {data.timeline.map((d: any, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
+                    <div className="text-[9px] font-bold text-slate-500 mb-1">{d.minutes > 0 ? `${d.minutes}` : ""}</div>
+                    <div
+                      className="w-full rounded-t-md bg-gradient-to-t from-rose-500 to-amber-400"
+                      style={{ height: `${(d.minutes / maxDay) * 100}%`, minHeight: d.minutes > 0 ? 4 : 2 }}
+                      title={`${d.date}: ${d.minutes}m`}
+                    />
+                    <div className="text-[8px] text-slate-400 mt-1 -rotate-45 origin-top-left whitespace-nowrap">{d.date.slice(5)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {data.machines.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">By Machine</h3>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-200 text-xs font-bold text-slate-600 uppercase">
+                  <th className="py-2 px-3">Machine</th>
+                  <th className="py-2 px-3">Category</th>
+                  <th className="py-2 px-3 text-center">Stoppages</th>
+                  <th className="py-2 px-3 text-right">Total Hours</th>
+                  <th className="py-2 px-3 text-right">Avg (min)</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {data.machines.map((m: any, idx: number) => (
+                  <tr key={idx} className="border-b border-slate-100">
+                    <td className="py-2 px-3 font-bold">{m.machineCode} - {m.machineName}</td>
+                    <td className="py-2 px-3 text-slate-600">{m.category}</td>
+                    <td className="py-2 px-3 text-center font-mono">{m.stoppages}</td>
+                    <td className="py-2 px-3 text-right font-mono font-bold">{m.hours}</td>
+                    <td className="py-2 px-3 text-right font-mono">{m.avgMinutes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === "Scrap & Rework Analysis") {
+    const maxScrap = Math.max(1, ...data.scrapByReason.map((r: any) => r.qty));
+    const maxRework = Math.max(1, ...data.reworkByReason.map((r: any) => r.qty));
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Scrap Qty" value={`${data.kpis.scrapQty} pcs`} color="text-rose-600" icon={Trash2} />
+          <StatCard label="Scrap Cost" value={`$${Number(data.kpis.scrapCost).toLocaleString()}`} color="text-rose-600" icon={DollarSign} />
+          <StatCard label="Rework Qty" value={`${data.kpis.reworkQty} pcs`} color="text-amber-600" icon={RefreshCcw} />
+          <StatCard label="Open Rework" value={String(data.kpis.openRework)} color={data.kpis.openRework > 0 ? "text-amber-600" : "text-emerald-600"} icon={AlertTriangle} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Scrap by Reason</h3>
+            {data.scrapByReason.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">No scrap recorded in this period.</p>
+            ) : (
+              <div className="space-y-3">
+                {data.scrapByReason.map((r: any, i: number) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-semibold text-slate-700">{r.reason}</span>
+                      <span className="font-mono text-xs font-bold text-slate-600">{r.qty} pcs · ${Number(r.cost).toLocaleString()}</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(r.qty / maxScrap) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Rework by Reason</h3>
+            {data.reworkByReason.length === 0 ? (
+              <p className="text-sm text-slate-500 italic">No rework recorded in this period.</p>
+            ) : (
+              <div className="space-y-3">
+                {data.reworkByReason.map((r: any, i: number) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-semibold text-slate-700">{r.reason}</span>
+                      <span className="font-mono text-xs font-bold text-slate-600">{r.qty} pcs · ${Number(r.cost).toLocaleString()}</span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(r.qty / maxRework) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {data.byMachine.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">By Machine</h3>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-200 text-xs font-bold text-slate-600 uppercase">
+                  <th className="py-2 px-3">Machine</th>
+                  <th className="py-2 px-3 text-center">Scrap</th>
+                  <th className="py-2 px-3 text-center">Rework</th>
+                  <th className="py-2 px-3 text-center">Events</th>
+                  <th className="py-2 px-3 text-right">Est. Cost</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {data.byMachine.map((m: any, idx: number) => (
+                  <tr key={idx} className="border-b border-slate-100">
+                    <td className="py-2 px-3 font-bold">{m.machineCode}</td>
+                    <td className="py-2 px-3 text-center font-mono text-rose-600 font-bold">{m.scrapQty}</td>
+                    <td className="py-2 px-3 text-center font-mono text-amber-600 font-bold">{m.reworkQty}</td>
+                    <td className="py-2 px-3 text-center font-mono">{m.events}</td>
+                    <td className="py-2 px-3 text-right font-mono font-bold">${Number(m.cost).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     );
   }

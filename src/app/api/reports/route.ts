@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { reports, orders, machines, orderOperations, customers, inventoryItems, users } from "@/db/schema";
+import {
+  reports,
+  orders,
+  machines,
+  orderOperations,
+  customers,
+  inventoryItems,
+  users,
+  qualityEvents,
+  downtimeEvents,
+} from "@/db/schema";
 import { eq, desc, gte, lte, and } from "drizzle-orm";
 import { authorize } from "@/lib/auth";
 
@@ -151,18 +161,138 @@ export async function POST(request: Request) {
       reportData = {
         operators: allUsers.map(u => {
           const operatorOps = allOps.filter(o => o.operatorId === u.id && o.status === "Completed");
-          const totalMinutes = operatorOps.reduce((sum, o) => sum + (o.actualMinutes || o.estimatedMinutes || 0), 0);
+          const totalEstimated = operatorOps.reduce((sum, o) => sum + (o.estimatedMinutes || 0), 0);
+          const totalActual = operatorOps.reduce((sum, o) => sum + (o.actualMinutes || 0), 0);
+          // Efficiency = planned time / actual time. >100% = faster than plan.
+          const efficiency = totalEstimated > 0 && totalActual > 0
+            ? Math.min(200, Math.round((totalEstimated / totalActual) * 100))
+            : operatorOps.length > 0 ? 100 : 0;
           return {
             name: u.name,
             role: u.role,
             completedOperations: operatorOps.length,
-            totalMinutes: Math.round(totalMinutes),
-            totalHours: Math.round((totalMinutes / 60) * 10) / 10,
-            avgEfficiency: operatorOps.length > 0 
-              ? Math.round((operatorOps.reduce((sum, o) => sum + ((o.estimatedMinutes || 0) / Math.max(o.actualMinutes || 1, 1)), 0) / operatorOps.length) * 100)
-              : 0,
+            totalMinutes: Math.round(totalActual),
+            totalHours: Math.round((totalActual / 60) * 10) / 10,
+            avgEfficiency: efficiency,
           };
         }),
+      };
+    } else if (type === "Downtime Analysis") {
+      const dateFromObj = new Date(dateFrom);
+      const dateToObj = new Date(dateTo);
+      const allDowntime = await db.select().from(downtimeEvents);
+      const allMachines = await db.select().from(machines);
+
+      const inRange = allDowntime.filter(e => {
+        const t = new Date(e.startedAt);
+        return t >= dateFromObj && t <= dateToObj;
+      });
+
+      // Closed events use their recorded duration; open events count up to "now".
+      const minutesOf = (e: typeof allDowntime[number]) => {
+        if (e.durationMinutes > 0) return e.durationMinutes;
+        const end = e.endedAt ? new Date(e.endedAt) : new Date();
+        return Math.max(0, Math.round((end.getTime() - new Date(e.startedAt).getTime()) / 60000));
+      };
+
+      const reasonMap: Record<string, { reason: string; count: number; minutes: number }> = {};
+      inRange.forEach(e => {
+        const m = minutesOf(e);
+        if (!reasonMap[e.reason]) reasonMap[e.reason] = { reason: e.reason, count: 0, minutes: 0 };
+        reasonMap[e.reason].count += 1;
+        reasonMap[e.reason].minutes += m;
+      });
+      const byReason = Object.values(reasonMap).sort((a, b) => b.minutes - a.minutes);
+
+      const machineRows = allMachines.map(m => {
+        const evs = inRange.filter(e => e.machineId === m.id);
+        const minutes = evs.reduce((s, e) => s + minutesOf(e), 0);
+        return {
+          machineCode: m.code,
+          machineName: m.name,
+          category: m.category,
+          stoppages: evs.length,
+          minutes,
+          hours: Math.round((minutes / 60) * 10) / 10,
+          avgMinutes: evs.length ? Math.round(minutes / evs.length) : 0,
+        };
+      }).filter(m => m.stoppages > 0).sort((a, b) => b.minutes - a.minutes);
+
+      const dayMap: Record<string, number> = {};
+      inRange.forEach(e => {
+        const d = new Date(e.startedAt).toISOString().split("T")[0];
+        dayMap[d] = (dayMap[d] || 0) + minutesOf(e);
+      });
+      const timeline = Object.entries(dayMap)
+        .map(([date, minutes]) => ({ date, minutes }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const totalMinutes = inRange.reduce((s, e) => s + minutesOf(e), 0);
+
+      reportData = {
+        kpis: {
+          totalStoppages: inRange.length,
+          totalMinutes,
+          totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+          avgMinutes: inRange.length ? Math.round(totalMinutes / inRange.length) : 0,
+          openStoppages: inRange.filter(e => !e.endedAt).length,
+        },
+        byReason,
+        machines: machineRows,
+        timeline,
+      };
+    } else if (type === "Scrap & Rework Analysis") {
+      const dateFromObj = new Date(dateFrom);
+      const dateToObj = new Date(dateTo);
+      const allQuality = await db.select().from(qualityEvents);
+      const allMachines = await db.select().from(machines);
+      const codeById = new Map(allMachines.map(m => [m.id, m.code]));
+
+      const inRange = allQuality.filter(e => {
+        const t = new Date(e.createdAt);
+        return t >= dateFromObj && t <= dateToObj;
+      });
+
+      const scrap = inRange.filter(e => e.eventType === "scrap");
+      const rework = inRange.filter(e => e.eventType === "rework");
+      const costOf = (e: typeof allQuality[number]) =>
+        (parseFloat(String(e.estimatedCost ?? "0")) || 0) * (e.quantity || 1);
+
+      const groupByReason = (evs: typeof inRange) => {
+        const map: Record<string, { reason: string; qty: number; cost: number; events: number }> = {};
+        evs.forEach(e => {
+          if (!map[e.reason]) map[e.reason] = { reason: e.reason, qty: 0, cost: 0, events: 0 };
+          map[e.reason].qty += e.quantity || 0;
+          map[e.reason].cost += costOf(e);
+          map[e.reason].events += 1;
+        });
+        return Object.values(map).sort((a, b) => b.cost - a.cost);
+      };
+
+      const machineMap: Record<string, { machineCode: string; scrapQty: number; reworkQty: number; events: number; cost: number }> = {};
+      inRange.forEach(e => {
+        const key = String(e.machineId ?? "unassigned");
+        if (!machineMap[key]) machineMap[key] = { machineCode: e.machineId ? (codeById.get(e.machineId) || "—") : "Unassigned", scrapQty: 0, reworkQty: 0, events: 0, cost: 0 };
+        if (e.eventType === "scrap") machineMap[key].scrapQty += e.quantity || 0;
+        else machineMap[key].reworkQty += e.quantity || 0;
+        machineMap[key].events += 1;
+        machineMap[key].cost += costOf(e);
+      });
+      const byMachine = Object.values(machineMap).sort((a, b) => b.cost - a.cost);
+
+      reportData = {
+        kpis: {
+          totalEvents: inRange.length,
+          scrapQty: scrap.reduce((s, e) => s + (e.quantity || 0), 0),
+          scrapCost: Math.round(scrap.reduce((s, e) => s + costOf(e), 0)),
+          reworkQty: rework.reduce((s, e) => s + (e.quantity || 0), 0),
+          reworkCost: Math.round(rework.reduce((s, e) => s + costOf(e), 0)),
+          openRework: rework.filter(e => e.disposition === "Open" || e.disposition === "In Rework").length,
+          reworkPassed: rework.filter(e => e.disposition === "Reworked & Passed").length,
+        },
+        scrapByReason: groupByReason(scrap),
+        reworkByReason: groupByReason(rework),
+        byMachine,
       };
     }
 
