@@ -24,7 +24,8 @@ export type ModuleId =
   | "workforce"
   | "wip"
   | "quality"
-  | "downtime";
+  | "downtime"
+  | "recipes";
 
 /**
  * Every module a role is allowed to access. Manager sees all. Other roles
@@ -47,6 +48,7 @@ export const MODULES_BY_ROLE: Record<Role, ModuleId[]> = {
     "wip",
     "quality",
     "downtime",
+    "recipes",
   ],
   "Sales Coordinator": [
     "dashboard",

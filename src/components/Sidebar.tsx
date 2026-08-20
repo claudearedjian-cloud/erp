@@ -22,7 +22,8 @@ import {
   CalendarClock,
   AlertTriangle,
   Zap,
-  LockKeyhole
+  LockKeyhole,
+  Workflow
 } from "lucide-react";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 import BrandMark from "@/components/BrandMark";
@@ -52,6 +53,7 @@ export default function Sidebar({
     { id: "dashboard", label: "Executive Dashboard", icon: LayoutDashboard, badge: "" },
     { id: "wip", label: "Live WIP Board", icon: Activity, badge: "Live" },
     { id: "orders", label: "Orders & Routing", icon: ClipboardList, badge: "Live" },
+    { id: "recipes", label: "Routing Recipes", icon: Workflow, badge: "Recipe" },
     { id: "schedule", label: "Dispatch Schedule", icon: CalendarDays, badge: "Plan" },
     { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare, badge: "Timeline" },
     { id: "machines", label: "Shop Floor Monitor", icon: Cpu, badge: "" },

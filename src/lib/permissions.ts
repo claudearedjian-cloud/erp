@@ -33,6 +33,8 @@ export type Action =
   | "downtime:read"
   | "downtime:write"
   | "wip:read"
+  | "recipes:read"
+  | "recipes:write"
   | "users:read"
   | "users:manage"
   | "admin:seed";
@@ -65,6 +67,7 @@ const MATRIX: Record<string, Action[]> = {
     "quality:read", "quality:write",
     "downtime:read", "downtime:write",
     "wip:read",
+    "recipes:read", "recipes:write",
     "users:read", "users:manage",
     "admin:seed",
   ],
@@ -150,6 +153,8 @@ const LABELS: Record<Action, string> = {
   "downtime:read": "view machine downtime records",
   "downtime:write": "record or end machine downtime",
   "wip:read": "view the live work-in-progress board",
+  "recipes:read": "view routing recipes",
+  "recipes:write": "create or edit routing recipes",
   "users:read": "view staff accounts",
   "users:manage": "manage staff accounts",
   "admin:seed": "reset demo data",

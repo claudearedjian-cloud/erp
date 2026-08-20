@@ -118,47 +118,73 @@ export async function POST(request: Request) {
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
 
-    const [cnc1, cnc2, edge1, edge2, saw1, drill1, finish1, asm1] = await db.insert(machines).values([
-      { name: "Holz-Her PRO 5000 CNC Router", code: "CNC-01", category: "CNC Router", status: "In-Use", hourlyCost: "85.00", location: "Bay A - Milling Cell", assignedOperatorId: diego.id, maintenanceDue: nextWeek, notes: "Spindle 1 RPM calibration confirmed. High precision vacuum table." },
-      { name: "Homag Centateq N-600 Nesting Cell", code: "CNC-02", category: "CNC Router", status: "Active", hourlyCost: "95.00", location: "Bay A - Milling Cell", assignedOperatorId: elena.id, maintenanceDue: nextWeek, notes: "Automated offload push table operational." },
+    const [cnc1, cnc2, edge1, edge2, saw1, drill1, finish1, asm1, baz1, orma1] = await db.insert(machines).values([
+      { name: "Rover A CNC", code: "ROVER-A", category: "CNC Router", status: "In-Use", hourlyCost: "85.00", location: "Bay A - Milling Cell", assignedOperatorId: diego.id, maintenanceDue: nextWeek, notes: "Spindle 1 RPM calibration confirmed. High precision vacuum table." },
+      { name: "Rover G CNC", code: "ROVER-G", category: "CNC Router", status: "Active", hourlyCost: "95.00", location: "Bay A - Milling Cell", assignedOperatorId: elena.id, maintenanceDue: nextWeek, notes: "Automated offload push table operational." },
       { name: "Brandt Ambition 1600 Edge Bander", code: "EDGE-01", category: "Edge Bander", status: "In-Use", hourlyCost: "65.00", location: "Bay B - Edge Processing", assignedOperatorId: elena.id, maintenanceDue: nextWeek, notes: "PUR glue cartridge inserted. Set for 1mm to 2mm tapes." },
       { name: "Biesse Akron 1400 Laser Bander", code: "EDGE-02", category: "Edge Bander", status: "Active", hourlyCost: "75.00", location: "Bay B - Edge Processing", assignedOperatorId: diego.id, maintenanceDue: nextWeek, notes: "Zero-glue line laser reactivation system for seamless edge finish." },
-      { name: "Altendorf F45 Digital Panel Saw", code: "SAW-01", category: "Panel Saw", status: "In-Use", hourlyCost: "55.00", location: "Bay C - Raw Sheet Prep", assignedOperatorId: diego.id, notes: "Motorized rip fence & tilting angle display active." },
+      { name: "Beam Saw", code: "BEAM-01", category: "Beam Saw", status: "In-Use", hourlyCost: "55.00", location: "Bay C - Raw Sheet Prep", assignedOperatorId: diego.id, notes: "Motorized rip fence & tilting angle display active." },
       { name: "Vitap Point K2 Acoustic CNC Drill", code: "DRL-01", category: "Drill Press", status: "Maintenance", hourlyCost: "60.00", location: "Bay D - Drilling & Doweling", maintenanceDue: tomorrow, notes: "Scheduled dust vacuum filter change and pneumatic clamp lubrications." },
       { name: "Cefla UV Automated Spray & Finish Line", code: "FIN-01", category: "Spray & Finish", status: "Active", hourlyCost: "115.00", location: "Clean Room Bay E", notes: "UV drying lamps tested at 99% efficacy. Inline exhaust active." },
       { name: "Assembly & Pneumatic Press Station Alpha", code: "ASM-01", category: "Assembly Table", status: "Active", hourlyCost: "45.00", location: "Bay F - Assembly & QC", assignedOperatorId: stefan.id, notes: "Heavy-duty carcass pressing clamp table with soft pads." },
+      { name: "Baz CNC", code: "BAZ", category: "CNC Router", status: "Active", hourlyCost: "90.00", location: "Bay A - Milling Cell", notes: "Heavy-duty 5-axis CNC for thick panels and press material." },
+      { name: "Orma Press 36mm", code: "ORMA-01", category: "Press", status: "Active", hourlyCost: "70.00", location: "Bay G - Press Area", notes: "36mm panel laminating & pressing line. Oversize trim required after press." },
     ]).returning();
 
-    // 4. Operation Routing Templates
+    // 4. Operation Routing Templates (the shop's real recipes)
     await db.insert(operationTemplates).values([
       {
-        name: "Full Kitchen & Closet Cabinet Manufacture",
-        description: "Standard end-to-end production flow for carcasses and doors: Cutting, edge treatment, CNC hinge drilling, carcass assembly, and QC.",
+        name: "Cutting Only",
+        description: "Beam saw cutting only — panels cut to size and dispatched.",
         defaultStepsJson: [
-          { stepOrder: 1, operationName: "Precision Panel Saw Cutting", machineCategory: "Panel Saw", estimatedMinutes: 90 },
-          { stepOrder: 2, operationName: "Laser / PUR Edge Banding", machineCategory: "Edge Bander", estimatedMinutes: 120 },
-          { stepOrder: 3, operationName: "CNC Routing & Dowel Hole Drilling", machineCategory: "CNC Router", estimatedMinutes: 150 },
-          { stepOrder: 4, operationName: "Carcass Assembly & Pressing", machineCategory: "Assembly Table", estimatedMinutes: 180 },
-          { stepOrder: 5, operationName: "Final QA Inspection & Pallet Packing", machineCategory: "Assembly Table", estimatedMinutes: 45 }
+          { stepOrder: 1, operationName: "Beam Saw Cutting", machineCategory: "Beam Saw", estimatedMinutes: 90 }
         ]
       },
       {
-        name: "Custom Architectural Paneling & Finish",
-        description: "Specialized flow for wall slats and commercial reception desk cladding involving CNC sculpting and UV protective coating.",
+        name: "Cutting + Edging",
+        description: "Beam saw cutting, then edge banding on all exposed edges.",
         defaultStepsJson: [
-          { stepOrder: 1, operationName: "Dimension Saw Sizing", machineCategory: "Panel Saw", estimatedMinutes: 60 },
-          { stepOrder: 2, operationName: "CNC Surface Profiling & Grooving", machineCategory: "CNC Router", estimatedMinutes: 240 },
-          { stepOrder: 3, operationName: "UV Automated Spray & Sanding", machineCategory: "Spray & Finish", estimatedMinutes: 180 },
-          { stepOrder: 4, operationName: "Finish QA & Scratch Protect Wrap", machineCategory: "Assembly Table", estimatedMinutes: 60 }
+          { stepOrder: 1, operationName: "Beam Saw Cutting", machineCategory: "Beam Saw", estimatedMinutes: 90 },
+          { stepOrder: 2, operationName: "Edge Banding", machineCategory: "Edge Bander", estimatedMinutes: 120 }
         ]
       },
       {
-        name: "Express Panel Sizing & Edge Banding Only",
-        description: "Fast-track trade order service for local cabinetmakers providing raw cutlist and edge band specification.",
+        name: "Cutting + Edging + CNC (after edging)",
+        description: "Cut, edge band, then CNC routing / drilling on the edged panel.",
         defaultStepsJson: [
-          { stepOrder: 1, operationName: "High-Speed Nesting & Cutlist Sawing", machineCategory: "Panel Saw", estimatedMinutes: 75 },
-          { stepOrder: 2, operationName: "All-Edge ABS Banding", machineCategory: "Edge Bander", estimatedMinutes: 90 },
-          { stepOrder: 3, operationName: "Dimension & Cleanliness Check", machineCategory: "Assembly Table", estimatedMinutes: 30 }
+          { stepOrder: 1, operationName: "Beam Saw Cutting", machineCategory: "Beam Saw", estimatedMinutes: 90 },
+          { stepOrder: 2, operationName: "Edge Banding", machineCategory: "Edge Bander", estimatedMinutes: 120 },
+          { stepOrder: 3, operationName: "CNC Routing", machineCategory: "CNC Router", estimatedMinutes: 150 }
+        ]
+      },
+      {
+        name: "Cutting + CNC + Edging (before edging)",
+        description: "Cut, CNC route / drill first, then edge band last.",
+        defaultStepsJson: [
+          { stepOrder: 1, operationName: "Beam Saw Cutting", machineCategory: "Beam Saw", estimatedMinutes: 90 },
+          { stepOrder: 2, operationName: "CNC Routing", machineCategory: "CNC Router", estimatedMinutes: 150 },
+          { stepOrder: 3, operationName: "Edge Banding", machineCategory: "Edge Bander", estimatedMinutes: 120 }
+        ]
+      },
+      {
+        name: "Cutting + Edging + 36mm Pressing",
+        description: "Cut and edge panels, press to 36mm on the Orma press, then re-cut and re-edge the pressed material.",
+        defaultStepsJson: [
+          { stepOrder: 1, operationName: "Beam Saw Cutting", machineCategory: "Beam Saw", estimatedMinutes: 90 },
+          { stepOrder: 2, operationName: "Edge Banding", machineCategory: "Edge Bander", estimatedMinutes: 120 },
+          { stepOrder: 3, operationName: "Orma 36mm Pressing", machineCategory: "Press", estimatedMinutes: 240 },
+          { stepOrder: 4, operationName: "Re-Cut Pressed Panel (Beam Saw)", machineCategory: "Beam Saw", estimatedMinutes: 60 },
+          { stepOrder: 5, operationName: "Edge Pressed Panel", machineCategory: "Edge Bander", estimatedMinutes: 90 }
+        ]
+      },
+      {
+        name: "Cutting + 36mm Pressing (no pre-edge)",
+        description: "Cut raw panels, press directly to 36mm, then re-cut and edge the pressed material.",
+        defaultStepsJson: [
+          { stepOrder: 1, operationName: "Beam Saw Cutting", machineCategory: "Beam Saw", estimatedMinutes: 90 },
+          { stepOrder: 2, operationName: "Orma 36mm Pressing", machineCategory: "Press", estimatedMinutes: 240 },
+          { stepOrder: 3, operationName: "Re-Cut Pressed Panel (Beam Saw)", machineCategory: "Beam Saw", estimatedMinutes: 60 },
+          { stepOrder: 4, operationName: "Edge Pressed Panel", machineCategory: "Edge Bander", estimatedMinutes: 90 }
         ]
       }
     ]);

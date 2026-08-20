@@ -21,7 +21,10 @@ import {
   Sparkles,
   X,
   Trash2,
-  Wrench
+  Wrench,
+  ChevronUp,
+  ChevronDown,
+  Save
 } from "lucide-react";
 
 interface OrdersViewProps {
@@ -64,31 +67,69 @@ export default function OrdersView({
     return d.toISOString().split("T")[0];
   });
   const [notes, setNotes] = useState("");
-  const [templateId, setTemplateId] = useState<string>(templates[0]?.id || "");
-  const [useCustomSteps, setCustomStepsMode] = useState(false);
-  const [customSteps, setCustomSteps] = useState([
-    { stepOrder: 1, operationName: "Precision Saw Cutting", estimatedMinutes: 60, machineId: machines[0]?.id || "" },
-    { stepOrder: 2, operationName: "Edge Banding Treatment", estimatedMinutes: 90, machineId: machines[2]?.id || "" },
-    { stepOrder: 3, operationName: "Assembly & QC", estimatedMinutes: 60, machineId: machines[machines.length - 1]?.id || "" },
-  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Routing: a recipe loads a chain of editable steps. Each step carries the
+  // exact machine (Beam Saw / Rover A vs G vs Baz / Orma) the operator chose.
+  type StepDraft = { operationName: string; machineId: string; machineCategory: string; estimatedMinutes: string };
+  const [steps, setSteps] = useState<StepDraft[]>([]);
+  const [recipeId, setRecipeId] = useState<string>("");
+  const [recipeName, setRecipeName] = useState("");
+
+  const machineCategories = Array.from(new Set((machines || []).map((m: any) => m.category).filter(Boolean))).sort();
+
+  const machineForCategory = (cat: string) => {
+    if (!machines?.length) return null;
+    return (
+      machines.find((m: any) => m.category === cat) ||
+      machines.find((m: any) => String(m.category || "").toLowerCase().includes(String(cat || "").toLowerCase())) ||
+      machines[0]
+    );
+  };
+
+  const blankStep = (): StepDraft => {
+    const first = machines[0];
+    return { operationName: "", machineId: first ? String(first.id) : "", machineCategory: first ? first.category : "", estimatedMinutes: "60" };
+  };
+
+  const loadRecipe = (tpl: any) => {
+    setRecipeId(String(tpl.id));
+    const loaded: StepDraft[] = (Array.isArray(tpl.defaultStepsJson) ? tpl.defaultStepsJson : []).map((s: any) => {
+      const m = machineForCategory(s.machineCategory);
+      return {
+        operationName: s.operationName || "New Operation",
+        machineId: m ? String(m.id) : "",
+        machineCategory: s.machineCategory || (m ? m.category : machineCategories[0] || ""),
+        estimatedMinutes: String(s.estimatedMinutes || 60),
+      };
+    });
+    setSteps(loaded.length > 0 ? loaded : [blankStep()]);
+  };
+
+  const addStep = () => setSteps(s => [...s, blankStep()]);
+  const removeStep = (i: number) => setSteps(s => s.filter((_, idx) => idx !== i));
+  const moveStep = (i: number, dir: -1 | 1) =>
+    setSteps(s => {
+      const j = i + dir;
+      if (j < 0 || j >= s.length) return s;
+      const copy = [...s];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
+  const updateStep = (i: number, field: keyof StepDraft, val: string) =>
+    setSteps(s => s.map((st, idx) => {
+      if (idx !== i) return st;
+      if (field === "machineId") {
+        const m = machines.find((mm: any) => String(mm.id) === String(val));
+        return { ...st, machineId: val, machineCategory: m ? m.category : st.machineCategory };
+      }
+      return { ...st, [field]: val };
+    }));
+
   useEffect(() => {
     if (!customerId && customers[0]?.id) setCustomerId(customers[0].id);
-    if (!templateId && templates[0]?.id) setTemplateId(String(templates[0].id));
-    if (machines.length > 0) {
-      setCustomSteps(steps => steps.map((step, index) => {
-        if (step.machineId) return step;
-        const preferred = index === 0
-          ? machines.find(machine => machine.category === "Panel Saw")
-          : index === 1
-            ? machines.find(machine => machine.category === "Edge Bander")
-            : machines.find(machine => machine.category === "Assembly Table");
-        return { ...step, machineId: preferred?.id || machines[0].id };
-      }));
-    }
-  }, [customers, templates, machines, customerId, templateId]);
+  }, [customers, customerId]);
 
   // Filtered orders
   const filteredOrders = orders.filter(order => {
@@ -108,6 +149,11 @@ export default function OrdersView({
       setErrorMsg("Please select a customer and provide a project title.");
       return;
     }
+    const validSteps = steps.filter(s => s.operationName.trim());
+    if (validSteps.length === 0) {
+      setErrorMsg("Add at least one routing step (or pick a recipe).");
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg("");
 
@@ -120,13 +166,12 @@ export default function OrdersView({
         totalValue: totalValue || "0.00",
         dueDate: new Date(dueDate),
         notes,
+        customSteps: validSteps.map(s => ({
+          operationName: s.operationName.trim(),
+          machineId: s.machineId ? Number(s.machineId) : null,
+          estimatedMinutes: Number(s.estimatedMinutes) || 60,
+        })),
       };
-
-      if (!useCustomSteps && templateId) {
-        payload.templateId = Number(templateId);
-      } else if (useCustomSteps && customSteps.length > 0) {
-        payload.customSteps = customSteps;
-      }
 
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -143,6 +188,9 @@ export default function OrdersView({
       setTitle("");
       setTotalValue("");
       setNotes("");
+      setSteps([]);
+      setRecipeId("");
+      setRecipeName("");
       onRefresh();
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to create order");
@@ -151,23 +199,41 @@ export default function OrdersView({
     }
   };
 
-  const addStep = () => {
-    setCustomSteps([...customSteps, {
-      stepOrder: customSteps.length + 1,
-      operationName: "New Shop Floor Step",
-      estimatedMinutes: 60,
-      machineId: machines[0]?.id || ""
-    }]);
-  };
-
-  const updateStep = (index: number, field: string, val: any) => {
-    const copy = [...customSteps];
-    copy[index] = { ...copy[index], [field]: val };
-    setCustomSteps(copy);
-  };
-
-  const removeStep = (index: number) => {
-    setCustomSteps(customSteps.filter((_, i) => i !== index));
+  const saveAsRecipe = async () => {
+    const validSteps = steps.filter(s => s.operationName.trim());
+    if (validSteps.length === 0) {
+      setErrorMsg("Add steps before saving a recipe.");
+      return;
+    }
+    const name = recipeName.trim();
+    if (!name) {
+      setErrorMsg("Type a recipe name before saving.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          description: "Saved from order entry",
+          defaultStepsJson: validSteps.map((s, i) => ({
+            stepOrder: i + 1,
+            operationName: s.operationName.trim(),
+            machineCategory: s.machineCategory,
+            estimatedMinutes: Number(s.estimatedMinutes) || 60,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to save recipe");
+      }
+      setRecipeName("");
+      onRefresh();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to save recipe");
+    }
   };
 
   const getPriorityBadge = (p: string) => {
@@ -556,126 +622,101 @@ export default function OrdersView({
                 </div>
               </div>
 
-              {/* WORKFLOW ROUTING SELECTION */}
+              {/* MACHINE ROUTING: RECIPES + STEP CHAIN */}
               <div className="pt-4 border-t border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <label className="block text-sm font-black text-white flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-500" />
-                      <span>Machine Workflow & Operation Routing</span>
-                    </label>
-                    <p className="text-[11px] text-slate-400">Choose how this order travels across the machines in your service center.</p>
-                  </div>
-                  <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setCustomStepsMode(false)}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition ${!useCustomSteps ? "bg-amber-600 text-white" : "text-slate-400 hover:text-white"}`}
-                    >
-                      Use Template
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCustomStepsMode(true)}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition ${useCustomSteps ? "bg-amber-600 text-white" : "text-slate-400 hover:text-white"}`}
-                    >
-                      Custom Routing
-                    </button>
-                  </div>
+                <div className="mb-3">
+                  <label className="block text-sm font-black text-white flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-amber-500" />
+                    <span>Machine Routing</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400">Pick a recipe, then confirm the exact machine per step. Each step is tracked individually on the floor.</p>
                 </div>
 
-                {!useCustomSteps ? (
-                  <div className="space-y-2.5">
-                    {templates.map(tpl => (
-                      <div
-                        key={tpl.id}
-                        onClick={() => setTemplateId(String(tpl.id))}
-                        className={`p-3.5 rounded-xl border transition cursor-pointer flex items-start gap-3 ${
-                          String(templateId) === String(tpl.id)
-                            ? "bg-amber-500/10 border-amber-500 shadow-md shadow-amber-950/30"
-                            : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
-                        }`}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 ${
-                          String(templateId) === String(tpl.id) ? "border-amber-500 bg-amber-500" : "border-slate-600"
-                        }`}>
-                          {String(templateId) === String(tpl.id) && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-bold text-white text-xs">{tpl.name}</div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">{tpl.description}</div>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            {Array.isArray(tpl.defaultStepsJson) && tpl.defaultStepsJson.map((s: any, idx: number) => (
-                              <React.Fragment key={idx}>
-                                <span className="bg-slate-800 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-700">
-                                  {s.stepOrder}. {s.operationName} ({s.estimatedMinutes}m)
-                                </span>
-                                {idx < tpl.defaultStepsJson.length - 1 && (
-                                  <span className="text-slate-600 font-bold">→</span>
-                                )}
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-                    <div className="text-[11px] text-slate-400 font-medium mb-2 flex items-center justify-between">
-                      <span>Define step-by-step sequence through machines:</span>
-                      <button
-                        type="button"
-                        onClick={addStep}
-                        className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Add Operation Step
+                {/* Recipe chips */}
+                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => { setSteps([blankStep()]); setRecipeId(""); }}
+                    className={`shrink-0 rounded-xl border px-3 py-1.5 text-[11px] font-bold transition ${recipeId === "" ? "border-amber-400 bg-amber-500 text-slate-950" : "border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-600"}`}
+                  >
+                    Build from scratch
+                  </button>
+                  {templates.map(tpl => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => loadRecipe(tpl)}
+                      className={`shrink-0 rounded-xl border px-3 py-1.5 text-[11px] font-bold transition ${recipeId === String(tpl.id) ? "border-amber-400 bg-amber-500 text-slate-950" : "border-slate-800 bg-slate-950/60 text-slate-300 hover:border-slate-600"}`}
+                    >
+                      {tpl.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Step chain */}
+                <div className="mt-3 space-y-2.5 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium text-slate-400">Step sequence ({steps.length}):</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Recipe name"
+                        value={recipeName}
+                        onChange={e => setRecipeName(e.target.value)}
+                        className="w-36 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-white placeholder-slate-500"
+                      />
+                      <button type="button" onClick={saveAsRecipe} className="flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300">
+                        <Save className="h-3.5 w-3.5" /> Save recipe
+                      </button>
+                      <button type="button" onClick={addStep} className="flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300">
+                        <Plus className="h-3.5 w-3.5" /> Add step
                       </button>
                     </div>
-                    {customSteps.map((step, idx) => (
-                      <div key={idx} className="flex items-center gap-3 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
-                        <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center flex-shrink-0">
-                          {idx + 1}
-                        </span>
+                  </div>
+
+                  {steps.length === 0 ? (
+                    <div className="py-6 text-center text-[11px] text-slate-500">Pick a recipe above, or add a step, to define the routing.</div>
+                  ) : (
+                    steps.map((step, idx) => (
+                      <div key={idx} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 p-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-xs font-black text-amber-400">{idx + 1}</span>
                         <input
                           type="text"
                           value={step.operationName}
-                          onChange={(e) => updateStep(idx, "operationName", e.target.value)}
-                          className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1 text-xs text-white"
-                          placeholder="Operation Name"
-                          required
+                          onChange={e => updateStep(idx, "operationName", e.target.value)}
+                          className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white"
+                          placeholder="Operation name"
                         />
                         <select
                           value={step.machineId}
-                          onChange={(e) => updateStep(idx, "machineId", e.target.value)}
-                          className="w-40 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white truncate"
+                          onChange={e => updateStep(idx, "machineId", e.target.value)}
+                          className="w-44 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white"
                         >
-                          <option value="">Any Machine Station</option>
-                          {machines.map(m => (
-                            <option key={m.id} value={m.id}>{m.code} ({m.name})</option>
+                          <option value="">Assign later</option>
+                          {machineCategories.map(cat => (
+                            <optgroup key={cat} label={cat}>
+                              {machines.filter((m: any) => m.category === cat).map((m: any) => (
+                                <option key={m.id} value={m.id}>{m.code} — {m.name}</option>
+                              ))}
+                            </optgroup>
                           ))}
                         </select>
                         <input
                           type="number"
                           value={step.estimatedMinutes}
-                          onChange={(e) => updateStep(idx, "estimatedMinutes", e.target.value)}
-                          className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white text-center font-mono"
-                          placeholder="Mins"
-                          title="Estimated Minutes"
+                          onChange={e => updateStep(idx, "estimatedMinutes", e.target.value)}
+                          className="w-20 rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-center font-mono text-xs text-white"
+                          title="Estimated minutes"
                         />
-                        {customSteps.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeStep(idx)}
-                            className="text-slate-500 hover:text-rose-400 p-1 transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <div className="flex flex-col">
+                          <button type="button" onClick={() => moveStep(idx, -1)} disabled={idx === 0} className="p-0.5 text-slate-500 hover:text-amber-400 disabled:opacity-30"><ChevronUp className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => moveStep(idx, 1)} disabled={idx === steps.length - 1} className="p-0.5 text-slate-500 hover:text-amber-400 disabled:opacity-30"><ChevronDown className="h-3.5 w-3.5" /></button>
+                        </div>
+                        <button type="button" onClick={() => removeStep(idx)} className="p-1.5 text-slate-500 transition hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Submit Buttons */}

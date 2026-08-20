@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { error: authError } = await authorize("orders:write");
+  const { error: authError } = await authorize("recipes:write");
   if (authError) return authError;
 
   try {
@@ -29,10 +29,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name and steps array are required." }, { status: 400 });
     }
 
+    // Normalize steps: sequential stepOrder, trimmed fields, sane minutes.
+    const steps = defaultStepsJson.map((s: any, i: number) => ({
+      stepOrder: i + 1,
+      operationName: String(s.operationName || "").trim(),
+      machineCategory: String(s.machineCategory || "").trim(),
+      estimatedMinutes: Number(s.estimatedMinutes) || 60,
+    })).filter((s: any) => s.operationName);
+
+    if (steps.length === 0) {
+      return NextResponse.json({ error: "A recipe needs at least one named step." }, { status: 400 });
+    }
+
     const [newTpl] = await db.insert(operationTemplates).values({
-      name,
+      name: String(name).trim(),
       description: description || "Custom workflow routing",
-      defaultStepsJson
+      defaultStepsJson: steps,
     }).returning();
 
     return NextResponse.json(newTpl, { status: 201 });

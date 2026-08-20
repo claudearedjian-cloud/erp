@@ -20,6 +20,7 @@ import SettingsView from "@/components/SettingsView";
 import WipBoardView from "@/components/WipBoardView";
 import QualityView from "@/components/QualityView";
 import DowntimeView from "@/components/DowntimeView";
+import RecipeManagerView from "@/components/RecipeManagerView";
 import FullscreenSplash from "@/components/FullscreenSplash";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 
@@ -179,7 +180,7 @@ export default function WoodTekERP() {
   const tabToModule = (tab: string): ModuleId | null => {
     if (tab === "station") return "operator";
     if (tab.startsWith("order-")) return "orders";
-    const allowed: ModuleId[] = ["dashboard", "orders", "machines", "operator", "customers", "inventory", "schedule", "gantt", "cmms", "reports", "settings", "workforce", "wip", "quality", "downtime"];
+    const allowed: ModuleId[] = ["dashboard", "orders", "machines", "operator", "customers", "inventory", "schedule", "gantt", "cmms", "reports", "settings", "workforce", "wip", "quality", "downtime", "recipes"];
     return (allowed as string[]).includes(tab) ? (tab as ModuleId) : null;
   };
 
@@ -263,6 +264,7 @@ export default function WoodTekERP() {
           {activeTab === "wip" && <WipBoardView onSelectOrder={handleSelectOrder} onNavigate={setActiveTab} />}
           {activeTab === "quality" && <QualityView currentUser={currentUser} onSelectOrder={handleSelectOrder} />}
           {activeTab === "downtime" && <DowntimeView currentUser={currentUser} />}
+          {activeTab === "recipes" && <RecipeManagerView onRefresh={fetchAllData} />}
           {activeTab === "settings" && <SettingsView currentUser={currentUser} />}
         </main>
       </div>
