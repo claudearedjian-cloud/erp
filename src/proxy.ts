@@ -15,6 +15,9 @@ const PUBLIC_API = new Set([
   "/api/auth/roster", // employee picker shown on the sign-in screen
   "/api/bootstrap", // first owner creation; route closes itself after first account
   "/api/health", // container healthcheck
+  // PIMS folder scan: allowed through the edge because the route itself
+  // checks for loopback origin (the local watcher) or a manager session.
+  "/api/pims/scan",
   // Seeding is allowed through the edge because the route itself permits it
   // ONLY while the users table is empty (first-run bootstrap); afterwards it
   // demands the admin:seed capability.

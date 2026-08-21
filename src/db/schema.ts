@@ -462,3 +462,33 @@ export const downtimeEventsRelations = relations(downtimeEvents, ({ one }) => ({
     relationName: "downtime_operator",
   }),
 }));
+
+// ----------------------------------------------------------------------------
+// PIMS bridge: key-value config + an import log (de-duplication key is the
+// PIMS invoice number, which must be unique).
+// ----------------------------------------------------------------------------
+export const pimsSettings = pgTable("pims_settings", {
+  id: serial("id").primaryKey(),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: json("setting_value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const pimsImports = pgTable("pims_imports", {
+  id: serial("id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  customerName: text("customer_name"),
+  orderId: integer("order_id").references(() => orders.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("imported"), // imported | skipped
+  message: text("message"),
+  rawXml: text("raw_xml"),
+  importedAt: timestamp("imported_at").defaultNow().notNull(),
+});
+
+export const pimsImportsRelations = relations(pimsImports, ({ one }) => ({
+  order: one(orders, {
+    fields: [pimsImports.orderId],
+    references: [orders.id],
+  }),
+}));

@@ -23,7 +23,8 @@ import {
   AlertTriangle,
   Zap,
   LockKeyhole,
-  Workflow
+  Workflow,
+  Import
 } from "lucide-react";
 import { canAccessModule, type ModuleId } from "@/lib/moduleAccess";
 import BrandMark from "@/components/BrandMark";
@@ -64,6 +65,7 @@ export default function Sidebar({
     { id: "station", label: "Operator Station Mode", icon: Tablet, badge: "Touch" },
     { id: "customers", label: "Clients & Architects", icon: Users, badge: "" },
     { id: "inventory", label: "Wood & Edge Stock", icon: Package, badge: "" },
+    { id: "pims", label: "PIMS Import", icon: Import, badge: "Link" },
     { id: "reports", label: "System Reports", icon: FileText, badge: "PDF" },
     { id: "settings", label: "General Settings", icon: SettingsIcon, badge: "" },
   ];

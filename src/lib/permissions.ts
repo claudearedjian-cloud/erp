@@ -35,6 +35,8 @@ export type Action =
   | "wip:read"
   | "recipes:read"
   | "recipes:write"
+  | "pims:read"
+  | "pims:write"
   | "users:read"
   | "users:manage"
   | "admin:seed";
@@ -68,6 +70,7 @@ const MATRIX: Record<string, Action[]> = {
     "downtime:read", "downtime:write",
     "wip:read",
     "recipes:read", "recipes:write",
+    "pims:read", "pims:write",
     "users:read", "users:manage",
     "admin:seed",
   ],
@@ -155,6 +158,8 @@ const LABELS: Record<Action, string> = {
   "wip:read": "view the live work-in-progress board",
   "recipes:read": "view routing recipes",
   "recipes:write": "create or edit routing recipes",
+  "pims:read": "view the PIMS import log and settings",
+  "pims:write": "import PIMS invoices or change PIMS settings",
   "users:read": "view staff accounts",
   "users:manage": "manage staff accounts",
   "admin:seed": "reset demo data",
