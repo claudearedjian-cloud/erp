@@ -45,7 +45,7 @@ export default function MachinesView({
   const [assignedOperatorId, setAssignedOperatorId] = useState(users[0]?.id || "");
   const [notes, setNotes] = useState("");
 
-  const categories = ["All", "CNC Router", "Edge Bander", "Panel Saw", "Drill Press", "Spray & Finish", "Assembly Table"];
+  const categories = ["All", "Beam Saw", "Edge Bander", "CNC Router", "Press", "Panel Saw", "Drill Press", "Spray & Finish", "Assembly Table"];
   
   const filteredMachines = categoryFilter === "All" ? machines : machines.filter(m => m.category === categoryFilter);
 
